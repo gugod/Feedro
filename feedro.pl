@@ -55,6 +55,11 @@ post '/feed/:identifier/items' => sub {
 
     my $feed = $feeds{$id};
     $feed->add_item(%$item);
+
+    if (@{ $feed->feed->{items} } > 1000) {
+        shift @{ $feed->feed->{items} };
+    }
+
     save_feeds();
     
     $c->render( json => { "ok" => \1 });
