@@ -14,9 +14,9 @@ my %feeds;
 sub save_feeds {
     return unless FEEDRO_STORAGE_DIR;
 
-    for my $id (keys %feeds) {
+    for my $id ( keys %feeds ) {
         my $str = $feeds{$id}->to_string;
-        path(FEEDRO_STORAGE_DIR, "${id}.json")->spew_utf8($str);
+        path( FEEDRO_STORAGE_DIR, "${id}.json" )->spew_utf8($str);
     }
 
     return;
@@ -29,7 +29,7 @@ sub load_feeds {
         sub {
             my ($path) = @_;
             return unless $path =~ /\.json$/;
-            my $id = $path->basename('.json');
+            my $id      = $path->basename('.json');
             my $content = $path->slurp_utf8();
             $feeds{$id} = JSON::Feed->parse( \$content );
         },
@@ -40,34 +40,34 @@ sub load_feeds {
 # main
 
 put '/feed/:identifier' => sub {
-    my ($c) = @_;
-    my $id = $c->param('identifier');
+    my ($c)  = @_;
+    my $id   = $c->param('identifier');
     my $feed = $c->req->json;
     $feeds{$id} = JSON::Feed->new(%$feed);
 
-    $c->render( json => { "ok" => \1 });
+    $c->render( json => { "ok" => \1 } );
 };
 
 post '/feed/:identifier/items' => sub {
-    my ($c) = @_;
-    my $id = $c->param('identifier');
+    my ($c)  = @_;
+    my $id   = $c->param('identifier');
     my $item = $c->req->json;
 
     my $feed = $feeds{$id};
     $feed->add_item(%$item);
 
-    if (@{ $feed->feed->{items} } > 1000) {
+    if ( @{ $feed->feed->{items} } > 1000 ) {
         shift @{ $feed->feed->{items} };
     }
 
     save_feeds();
-    
-    $c->render( json => { "ok" => \1 });
+
+    $c->render( json => { "ok" => \1 } );
 };
 
 get '/feed/:identifier' => sub {
-    my ($c) = @_;
-    my $id = $c->param('identifier');
+    my ($c)  = @_;
+    my $id   = $c->param('identifier');
     my $feed = $feeds{$id};
     $c->render( json => $feed->feed );
 };
