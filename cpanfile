@@ -1,2 +1,3 @@
 requires 'Mojolicious';
-requries 'JSON::Feed';
+requires 'JSON::Feed';
+requires 'Path::Tiny';
