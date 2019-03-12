@@ -30,7 +30,7 @@ sub load_feeds {
             my ($path) = @_;
             return unless $path =~ /\.json$/;
             my $id      = $path->basename('.json');
-            my $content = $path->slurp_utf8();
+            my $content = $path->slurp();
             $feeds{$id} = JSON::Feed->parse( \$content );
         },
         { recurse => 0, follow_symlinks => 0 },
@@ -53,6 +53,9 @@ post '/feed/:identifier/items' => sub {
     my $id   = $c->param('identifier');
     my $item = $c->req->json;
 
+    $item->{content_text} //= '';
+    $item->{title} //= 'Meaningless Title';
+
     my $feed = $feeds{$id};
     $feed->add_item(%$item);
 
@@ -69,7 +72,16 @@ get '/feed/:identifier' => sub {
     my ($c)  = @_;
     my $id   = $c->param('identifier');
     my $feed = $feeds{$id};
-    $c->render( json => $feed->feed );
+    unless ($feed) {
+        $c->render( data => '', status => 404 );
+        return;
+    }
+
+    $c->respond_to(
+        json => sub { $c->render( text => $feed->to_string ) },
+        any  => { data => '', status => 404 },
+    );
+    ;
 };
 
 load_feeds();
