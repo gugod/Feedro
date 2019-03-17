@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Mojolicious::Lite;
 use JSON::Feed;
+use Data::UUID;
 use Path::Tiny qw< path >;
 
 use constant FEEDRO_STORAGE_DIR => $ENV{FEEDRO_STORAGE_DIR} // '';
@@ -44,6 +45,7 @@ put '/feed/:identifier' => sub {
     my $id   = $c->param('identifier');
     my $feed = $c->req->json;
     $feeds{$id} = JSON::Feed->new(%$feed);
+    save_feeds();
 
     $c->render( json => { "ok" => \1 } );
 };
@@ -51,12 +53,30 @@ put '/feed/:identifier' => sub {
 post '/feed/:identifier/items' => sub {
     my ($c)  = @_;
     my $id   = $c->param('identifier');
+
+    my $feed = $feeds{$id};
+    unless ($feed) {
+        $c->res->code(404);
+        $c->render(json => { ok => \0, errors => [ "Feed '$id' is unknown." ] });
+        return;
+    }
+
+
     my $item = $c->req->json;
 
+    if (!$item) {
+        $item = {};
+        for my $x (qw< id title content_text url >) {
+            if (my $y = $c->param($x)) {
+                $item->{$x} = $y;
+            }
+        }
+    }
+
+    $item->{id} //= Data::UUID->new->create_str();
     $item->{content_text} //= '';
     $item->{title} //= 'Meaningless Title';
 
-    my $feed = $feeds{$id};
     $feed->add_item(%$item);
 
     if ( @{ $feed->feed->{items} } > 1000 ) {
