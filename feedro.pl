@@ -61,7 +61,6 @@ post '/feed/:identifier/items' => sub {
         return;
     }
 
-
     my $item = $c->req->json;
 
     if (!$item) {
@@ -101,7 +100,6 @@ get '/feed/:identifier' => sub {
         json => sub { $c->render( text => $feed->to_string ) },
         any  => { data => '', status => 404 },
     );
-    ;
 };
 
 load_feeds();
