@@ -1,0 +1,132 @@
+# Feedro
+
+## Description
+
+Feedro is a dead-simple service that allow clients to:
+
+1. create new feeds
+2. delete previously-created feeds
+3. post new item to a previously-created feed
+4. remove all items from the given feed
+5. Retrieve the feed in the format of JSON Feed or others.
+
+## API
+
+### 1. Feed creation
+
+The feed creation requires a bit of handshaking, first, client must first
+accquire a creation intend, then compute a proof of work, and finally submit
+the feed creation request with that piece of proof.
+
+A creation intend can be accquired by sending the following request:
+
+    POST /creation_intend/feed
+    
+    {  "seed": "4183", "time": "1568462482" }
+
+The response contain "seed" and "time", both are strings in ASCII encoding.
+This documentation show examples where they appears to be just digits, but
+that is not necessarily true.
+
+Then, the client computes a proof. The proof content is a string with
+3 components, joined by comma characters, with no whitespaces in between:
+
+    <seed> "," <time> "," <prime number>
+
+For example, here's a valid proof content:
+
+    4183,1568462482,1559113
+
+The sha1_hex of a proof content must begin with a substring "feed"
+as demonstrated with the following command:
+
+    > echo -n 4183,1568462482,1559113 | openssl sha1
+    feedf5dd6aac2f6c0b0bbd01f7301d8e6b4b8a26
+
+The client must find a prime number that can satisfy this condition, and send
+this number when creating a feed.
+
+Finally, send a POST request with the details of the feed, as well as the
+proof.  The provided proof must be an array of 2 elements. The 1st one is the
+proof content, while the 2nd elemen is the sha1 of the proof content.
+
+    POST /feed/
+    {
+        title: "Foobar",
+        description: "A feed about foobar",
+        proof: ["4183,1568462482,1559113", "feedf5dd6aac2f6c0b0bbd01f7301d8e6b4b8a26"]
+    }
+
+Upon creation failures, the server returns 500 status code, with
+
+a "error" message describing :
+
+    {
+        "error": "An error occured."
+    }
+    
+The response upon successful ceration, shall  contain the an identifier,
+as well as a token:
+
+    {
+        "identifier": "82253db2-d6e2-11e9-ae6d-48d705cb7aad",
+        "token": "ZHTQ1e5J0uNGw3Gynp-BcWmaY24"
+    }
+
+Both piece of information must be preserved by the client side.
+
+Identifier is used in the URL to append a new item to a feed.  Token must be
+provided for all other requests in the HTTP authentication header as a "Bearer
+token". With the example above, the line of such header would be this:
+
+    Authentication: Bearer ZHTQ1e5J0uNGw3Gynp-BcWmaY24
+
+POST / PUT requests without a matching token are simply ignored and responded
+with 401 status code.
+
+### 2. Feed deletion
+
+To delete a feed, send a DELETE request with bearer token.
+
+    DELETE /feed/:identifier
+    Authentication: Bearer :token
+
+### 3. Adding new items
+
+To add a new item into a feed, send a POST request with bearer token.
+
+    POST /feed/:identifier/items
+    Authentication: Bearer :token
+    {
+        "id": "xxx",
+        "title": "xxx",
+        "url": "xxx",
+        "content_text": "xxx"
+        "content_html": "xxx"
+    }
+
+The payload of this request is modeled as the "Items" section in the spec of jsonfeed:
+
+    https://jsonfeed.org/version/1
+
+### 4. Deleting items
+
+To delete items from a feed, send the following DELETE request
+
+    DELETE /feed/:identifier/items
+    Authentication: Bearer :token
+
+This removes all items from the feed.
+    
+### 5. Retrieving feed
+
+To retrieve the feed, send the following GET request:
+
+    GET /feed/:identifier.json
+
+The feed returns in JSON Feed format. Alternatively,
+RSS format and Atom format of the identical feed can be retrieved,
+by changing the ".json" part of the url to ".rss", or ".atom"
+
+    GET /feed/:identifier.rss
+    GET /feed/:identifier.atom
