@@ -64,8 +64,15 @@ sub is_prime {
     return 1;
 }
 
-sub proof_looks_good {
-    my ($title, $description, $t, $p, $sha1) = @_;
+sub proof_looks_ok {
+    my ($req) = @_;
+
+    my $title       = $req->{title};
+    my $description = $req->{description};
+    my $t           = $req->{proof}[0];
+    my $p           = $req->{proof}[1];
+    my $sha1        = $req->{proof}[2];
+
     my $now = time();
     return 0 if ($now < $t || $now - $t > 3600 || !is_prime($p));
     my $h = sha1_hex(join "\n", $title, $description, $t, $p);
@@ -74,19 +81,16 @@ sub proof_looks_good {
 
 sub create_feed {
     my $req = $_[0];
-    my %feed = %$req;
-    my $proof = delete($feed{proof});
-
-    unless (proof_looks_good($feed{title}, $feed{description}, @$proof)) {
-        return undef;
-    }
 
     my $ug = Data::UUID->new;
     my $uuid = $ug->create;
     my $id = $ug->to_string($uuid);
 
-    $feeds{$id} = JSON::Feed->new(%feed);
-    my $token = $tokens{$id} = sha1_base64( join "\n", time, rand(), $id, @$proof );
+    $feeds{$id} = JSON::Feed->new(
+        title => $req->{title},
+        description => $req->{description}
+    );
+    my $token = $tokens{$id} = sha1_base64( join "\n", time, rand(), $id );
     save_feeds();
 
     return { identifier => $id, token => $token };
@@ -97,14 +101,24 @@ sub create_feed {
 ## API: Feed creation
 post '/feed' => sub {
     my ($c) = @_;
-    my $res = create_feed($c->req->json);
 
-    if ($res && $res->{identifier} && $res->{token}) {
-        $c->render( json => $res );
+    my $req = $c->req->json;
+
+    unless (proof_looks_ok( $req )) {
+        $c->res->code(400);
+        $c->render( json => { error => "Proof is not good" });
         return;
     }
 
-    $c->render( json => { error => "Feed creation failed" });
+    my $res = create_feed($req);
+
+    if (!$res || !$res->{identifier} ||! $res->{token}) {
+        $c->res->code(400);
+        $c->render( json => { error => "Feed creation failed" });
+        return;
+    }
+
+    $c->render( json => $res );
 };
 
 put '/feed/:identifier' => sub {

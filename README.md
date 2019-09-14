@@ -33,9 +33,8 @@ are represented in decimal positive integers. Timestamp should be in the range
 of 3600s ago to present, relative to the server time. Feedro server would
 create the feed only if the proof is valid.
 
-Upon creation failures, the server returns 500 status code, with
-
-a "error" message describing :
+Upon creation failures, the server returns 400 status code, with
+a "error" message describing what might be wrong:
 
     {
         "error": "An error occured."
