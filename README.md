@@ -14,48 +14,24 @@ Feedro is a dead-simple service that allow clients to:
 
 ### 1. Feed creation
 
-The feed creation requires a bit of handshaking, first, client must first
-accquire a creation intend, then compute a proof of work, and finally submit
-the feed creation request with that piece of proof.
-
-A creation intend can be accquired by sending the following request:
-
-    POST /creation_intend/feed
-    
-    {  "seed": "4183", "time": "1568462482" }
-
-The response contain "seed" and "time", both are strings in ASCII encoding.
-This documentation show examples where they appears to be just digits, but
-that is not necessarily true.
-
-Then, the client computes a proof. The proof content is a string with
-3 components, joined by comma characters, with no whitespaces in between:
-
-    <seed> "," <time> "," <prime number>
-
-For example, here's a valid proof content:
-
-    4183,1568462482,1559113
-
-The sha1_hex of a proof content must begin with a substring "feed"
-as demonstrated with the following command:
-
-    > echo -n 4183,1568462482,1559113 | openssl sha1
-    feedf5dd6aac2f6c0b0bbd01f7301d8e6b4b8a26
-
-The client must find a prime number that can satisfy this condition, and send
-this number when creating a feed.
-
-Finally, send a POST request with the details of the feed, as well as the
-proof.  The provided proof must be an array of 2 elements. The 1st one is the
-proof content, while the 2nd elemen is the sha1 of the proof content.
+Feed creation requires 3 pieces of information, a feed title, a description, and a "proof".
+Such as:
 
     POST /feed/
     {
         title: "Foobar",
         description: "A feed about foobar",
-        proof: ["4183,1568462482,1559113", "feedf5dd6aac2f6c0b0bbd01f7301d8e6b4b8a26"]
+        proof: [1568462482, 1559113, "feedf5dd6aac2f6c0b0bbd01f7301d8e6b4b8a26"]
     }
+
+The values inside the "proof" array are: a timestamp, a prime number, and a sha1 of:
+
+    title ~ "\n" ~ description ~ "\n" ~ timestamp ~ "\n" ~ prime_number
+
+The "~" above means string concatenation. Both timestamp and the prime_number
+are represented in decimal positive integers. Timestamp should be in the range
+of 3600s ago to present, relative to the server time. Feedro server would
+create the feed only if the proof is valid.
 
 Upon creation failures, the server returns 500 status code, with
 
