@@ -35,46 +35,85 @@ sub proof {
 }
 
 sub test_successful_creation {
-    my $ua = Mojo::UserAgent->new();
-
-    my $title = "Food";
-    my $description = "A feed about food";
-    my $tx = $ua->post(
-        FEEDRO . "/feed/",
-        json => {
-            title => $title,
-            description => $description,
-            proof => proof( $title, $description ),
-        }
-    );
-    my $res = $tx->result;
-    my $feed = $res->json;
-
-    is $res->code, "200", "A successful code";
-    is $feed, {
-        identifier => D(),
-        token => D(),
-    }, "The structure of successful response";
+    my $feed;
+    subtest "Attempt to create a feed, expect succesful response" => sub {
+        my $ua = Mojo::UserAgent->new();
+        my $title = "Food";
+        my $description = "A feed about food";
+        my $tx = $ua->post(
+            FEEDRO . "/feed/",
+            json => {
+                title => $title,
+                description => $description,
+                proof => proof( $title, $description ),
+            }
+        );
+        my $res = $tx->result;
+        $feed = $res->json;
+        is $res->code, "200", "A successful code";
+        is $feed, {
+            identifier => D(),
+            token => D(),
+        }, "The structure of successful response";
+    };
+    return $feed;
 }
 
 sub test_failure_creation {
-    my $ua = Mojo::UserAgent->new();
-    my $tx = $ua->post(
-        FEEDRO . "/feed/",
-        json => {
-            title => "Drink",
-            description => "Feed about drinks.",
-            proof => proof("XXX" , "YYY"), # Invalid proof
-        }
-    );
-    my $res = $tx->result;
-    my $feed = $res->json;
-    is $res->code, "400";
-    is $feed, {
-        error => D(),
+    subtest "Attempt to create feed with invalid proof, expect failure response", sub {
+        my $ua = Mojo::UserAgent->new();
+        my $tx = $ua->post(
+            FEEDRO . "/feed/",
+            json => {
+                title => "Drink",
+                description => "Feed about drinks.",
+                proof => proof("XXX" , "YYY"), # Invalid proof
+            }
+        );
+        my $res = $tx->result;
+        my $feed = $res->json;
+        is $res->code, "400";
+        is $feed, {
+            error => D(),
+        };
+    };
+}
+
+sub test_add_feed_items {
+    subtest "Attempt to create a feed and than add an item into it." => sub {
+        my $feed = test_successful_creation();
+        my $ua = Mojo::UserAgent->new();
+
+        my ($id, $token) = ($feed->{identifier}, $feed->{token});
+
+        subtest "Without tokens, expect failures" => sub {
+            my $tx = $ua->post(
+                FEEDRO . "/feed/${id}/items",
+                json => {
+                    title => "Some random stuff",
+                    content_text => "XXX",
+                    url => "https://example.com",
+                }
+            );
+            is $tx->result->code, "401",
+        };
+
+        subtest "With the correct token, expect successes" => sub {
+            my $tx = $ua->post(
+                FEEDRO . "/feed/${id}/items",
+                { Authentication => "Bearer $token" },
+                json => {
+                    title => "Some random stuff",
+                    content_text => "XXX",
+                    url => "https://example.com",
+                }
+            );
+            is $tx->result->code, "200";
+        };
     };
 }
 
 test_failure_creation;
-test_successful_creation;
+test_add_feed_items;
+
 done_testing;

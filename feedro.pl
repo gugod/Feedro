@@ -9,11 +9,25 @@ use Data::UUID;
 use Path::Tiny qw< path >;
 use Data::Dumper;
 
-use constant FEEDRO_STORAGE_DIR => $ENV{FEEDRO_STORAGE_DIR} // '';
+use constant {
+    FEEDRO_STORAGE_DIR => $ENV{FEEDRO_STORAGE_DIR} // '',
+
+    ERROR_TOKEN_INVALID => "Token is invalid",
+    ERROR_FEED_ID_UNKNOWN => "Unknown feed id",
+};
 
 # Storage
 my %feeds;
 my %tokens;
+
+sub token_in_request_header {
+    my ($c) = @_;
+    my $auth = $c->req->headers->header('Authentication') // '';
+    if ($auth =~ /\ABearer (.+)\z/) {
+        return $1;
+    }
+    return '';
+}
 
 sub save_feeds {
     return unless FEEDRO_STORAGE_DIR;
@@ -51,7 +65,7 @@ sub sha1_base64 {
     my ($x) = @_;
     my $sha1 = Digest::SHA1->new;
     $sha1->add($x);
-    my $b64 = $sha1->b64digest; 
+    my $b64 = $sha1->b64digest;
     my $b64uri = $b64 =~ y!+/!-_!r;
     return $b64uri;
 }
@@ -81,10 +95,7 @@ sub proof_looks_ok {
 
 sub create_feed {
     my $req = $_[0];
-
-    my $ug = Data::UUID->new;
-    my $uuid = $ug->create;
-    my $id = $ug->to_string($uuid);
+    my $id = Data::UUID->new->create_str();
 
     $feeds{$id} = JSON::Feed->new(
         title => $req->{title},
@@ -96,7 +107,27 @@ sub create_feed {
     return { identifier => $id, token => $token };
 }
 
-# main
+sub append_item {
+    my ($feed_id, $item, $token) = @_;
+    my $feed = $feeds{$feed_id};
+    return { error => ERROR_FEED_ID_UNKNOWN } unless $feed;
+    return { error => ERROR_TOKEN_INVALID } if $token ne $tokens{$feed_id};
+
+    $item->{id} //= Data::UUID->new->create_str();
+    $item->{content_text} //= '';
+    $item->{title} //= 'Meaningless Title';
+
+    $feed->add_item(%$item);
+
+    if ( @{ $feed->feed->{items} } > 1000 ) {
+        shift @{ $feed->feed->{items} };
+    }
+
+    save_feeds();
+    return {};
+}
+
+# Actions
 
 ## API: Feed creation
 post '/feed' => sub {
@@ -143,7 +174,6 @@ post '/feed/:identifier/items' => sub {
     }
 
     my $item = $c->req->json;
-
     if (!$item) {
         $item = {};
         for my $x (qw< id title content_text url >) {
@@ -153,18 +183,17 @@ post '/feed/:identifier/items' => sub {
         }
     }
 
-    $item->{id} //= Data::UUID->new->create_str();
-    $item->{content_text} //= '';
-    $item->{title} //= 'Meaningless Title';
-
-    $feed->add_item(%$item);
-
-    if ( @{ $feed->feed->{items} } > 1000 ) {
-        shift @{ $feed->feed->{items} };
+    my $token = token_in_request_header($c);
+    my $result = append_item( $id, $item, $token );
+    if ($result->{error}) {
+        if ($result->{error} eq ERROR_TOKEN_INVALID) {
+            $c->res->code(401);
+        } else {
+            $c->res->code(400);
+        }
+        $c->render( json => $result );
+        return;
     }
-
-    save_feeds();
-
     $c->render( json => { "ok" => \1 } );
 };
 
