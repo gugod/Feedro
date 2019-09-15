@@ -79,11 +79,11 @@ sub test_failure_creation {
     };
 }
 
-sub test_add_feed_items {
-    subtest "Attempt to create a feed and than add an item into it." => sub {
-        my $feed = test_successful_creation();
-        my $ua = Mojo::UserAgent->new();
+sub test_item_crud {
+    my $ua = Mojo::UserAgent->new();
+    my $feed = test_successful_creation();
 
+    subtest "Attempt to add an item into the feed." => sub {
         my ($id, $token) = ($feed->{identifier}, $feed->{token});
 
         subtest "Without tokens, expect failures" => sub {
@@ -111,9 +111,32 @@ sub test_add_feed_items {
             is $tx->result->code, "200";
         };
     };
+
+    subtest "Delete all items from the feed" => sub {
+        my ($id, $token) = ($feed->{identifier}, $feed->{token});
+        subtest "No token, expecting failures." => sub {
+            my $tx = $ua->delete(FEEDRO . "/feed/${id}/items");
+            is $tx->res->code, 401;
+            is $tx->res->json, {
+                error => D(),
+            };
+        };
+
+        subtest "Correct token, expecting successful." => sub {
+            my $tx = $ua->delete(
+                FEEDRO . "/feed/${id}/items",
+                { Authentication => "Bearer $token" }
+            );
+            is $tx->res->code, 200;
+            is $tx->res->json, {
+                error => DNE(),
+                ok => T(),
+            };
+        };
+    };
 }
 
 test_failure_creation;
-test_add_feed_items;
+test_item_crud;
 
 done_testing;

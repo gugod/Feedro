@@ -168,7 +168,7 @@ post '/feed/:identifier/items' => sub {
 
     my $feed = $feeds{$id};
     unless ($feed) {
-        $c->render( status => 404, json => { errors => ERROR_FEED_ID_UNKNOWN });
+        $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN });
         return;
     }
 
@@ -190,6 +190,28 @@ post '/feed/:identifier/items' => sub {
         return;
     }
     $c->render( json => { "ok" => \1 } );
+};
+
+del '/feed/:identifier/items' => sub {
+    my ($c) = @_;
+    my $id   = $c->param('identifier');
+
+    unless ($feeds{$id}) {
+        $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN });
+        return;
+    }
+
+    my $token = token_in_request_header($c);
+    unless ($tokens{$id} eq $token) {
+        $c->render( status => 401, json => { error => ERROR_TOKEN_INVALID });
+        return;
+    }
+
+    # XXX: Leaky abstraction.
+    $feeds{$id}->feed->{items} = [];
+    save_feeds();
+
+    $c->render( json => { ok => \1 });
 };
 
 get '/feed/:identifier' => sub {
