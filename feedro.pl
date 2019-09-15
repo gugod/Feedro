@@ -12,8 +12,10 @@ use Data::Dumper;
 use constant {
     FEEDRO_STORAGE_DIR => $ENV{FEEDRO_STORAGE_DIR} // '',
 
+    ERROR_PROOF_IS_NOT_GOOD => "Proof is not good",
     ERROR_TOKEN_INVALID => "Token is invalid",
     ERROR_FEED_ID_UNKNOWN => "Unknown feed id",
+    ERROR_FEED_CREATION_FAIL => "Feed creation failed",
 };
 
 # Storage
@@ -136,16 +138,14 @@ post '/feed' => sub {
     my $req = $c->req->json;
 
     unless (proof_looks_ok( $req )) {
-        $c->res->code(400);
-        $c->render( json => { error => "Proof is not good" });
+        $c->render( status => 400, json => { error => ERROR_PROOF_IS_NOT_GOOD });
         return;
     }
 
     my $res = create_feed($req);
 
     if (!$res || !$res->{identifier} ||! $res->{token}) {
-        $c->res->code(400);
-        $c->render( json => { error => "Feed creation failed" });
+        $c->render( status => 400, json => { error => ERROR_FEED_CREATION_FAIL });
         return;
     }
 
@@ -168,8 +168,7 @@ post '/feed/:identifier/items' => sub {
 
     my $feed = $feeds{$id};
     unless ($feed) {
-        $c->res->code(404);
-        $c->render(json => { ok => \0, errors => [ "Feed '$id' is unknown." ] });
+        $c->render( status => 404, json => { errors => ERROR_FEED_ID_UNKNOWN });
         return;
     }
 
@@ -186,12 +185,8 @@ post '/feed/:identifier/items' => sub {
     my $token = token_in_request_header($c);
     my $result = append_item( $id, $item, $token );
     if ($result->{error}) {
-        if ($result->{error} eq ERROR_TOKEN_INVALID) {
-            $c->res->code(401);
-        } else {
-            $c->res->code(400);
-        }
-        $c->render( json => $result );
+        my $code = ($result->{error} eq ERROR_TOKEN_INVALID) ? 401 : 400;
+        $c->render( status => $code, json => $result );
         return;
     }
     $c->render( json => { "ok" => \1 } );
@@ -202,7 +197,7 @@ get '/feed/:identifier' => sub {
     my $id   = $c->param('identifier');
     my $feed = $feeds{$id};
     unless ($feed) {
-        $c->render( data => '', status => 404 );
+        $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN } );
         return;
     }
 
