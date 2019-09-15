@@ -68,7 +68,7 @@ sub sha1_base64 {
     my $sha1 = Digest::SHA1->new;
     $sha1->add($x);
     my $b64 = $sha1->b64digest;
-    my $b64uri = $b64 =~ y!+/!-_!r;
+    my $b64uri = $b64 =~ y{+/}{-_}r;
     return $b64uri;
 }
 
