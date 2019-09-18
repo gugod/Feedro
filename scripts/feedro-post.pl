@@ -2,7 +2,7 @@
 use v5.18;
 use strict;
 use warnings;
-use HTTP::Tiny;
+use Mojo::UserAgent;
 use Getopt::Long qw< GetOptions >;
 use JSON qw< encode_json >;
 use Data::UUID;
@@ -11,13 +11,14 @@ use Data::Dumper qw< Dumper >;
 my %opts;
 GetOptions(
     \%opts,
-    "url=s",
     "title=s",
     "content_text=s",
+    "token=s"
 );
 
 my $feed_url = $ARGV[0] or die "A feed URL is required.";
 die "`title` is required.\n" unless $opts{title};
+die "`token` is required.\n" unless $opts{token};
 
 my %item;
 
@@ -31,19 +32,23 @@ for my $k (qw<title url content_text>) {
 
 $feed_url =~ s{\.json}{/items};
 
-my $response = HTTP::Tiny->new->post(
+my $ua = Mojo::UserAgent->new;
+my $tx = $ua->post(
     $feed_url,
-    { content => encode_json(\%item) }
+    { Authentication => "Bearer $opts{token}" },
+    json => \%item,
 );
-
-if ($response->{success}) {
+my $res = $tx->result;
+if ($res->is_error) {
+    say "Error: " . $res->message;
+} elsif ($res->is_success) {
     say 'Success';
 } else {
-    say 'Failed.';
-    say Dumper($response);
+    say "Not sure what happened... Response:";
+    say $res->code;
+    say $res->body;
 }
 
 __END__
 
-feedro-post.pl https://example.com/feed/links.json --url 'https://example.com/item/1' --title 'A new item is here' --content_text 'Some text content here.'
-
+feedro-post.pl https://example.com/feed/links.json --token ooxxooxxooxxooxx --url 'https://example.com/item/1' --title 'A new item is here' --content_text 'Some text content here.'
