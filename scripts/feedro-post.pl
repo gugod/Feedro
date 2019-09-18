@@ -13,6 +13,7 @@ GetOptions(
     \%opts,
     "title=s",
     "content_text=s",
+    "url=s",
     "token=s"
 );
 
