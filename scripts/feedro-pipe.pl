@@ -36,13 +36,30 @@ sub fetch_feed_items {
         sub {
             my $el = $_;
             my %o = (
-                title => $el->at("title") // '',
-                url   => $el->at("link")->attr("href") // '',
+                title        => $el->at("title"),
+                url          => $el->at("link")->attr("href"),
+                summary      => $el->at("summary"),
+                content_text => $el->at("content"),
             );
+
+            if (!defined($o{content_text}) && defined($o{summary})) {
+                $o{content_text} = delete $o{summary};
+            }
+
             for my $k (keys %o) {
-                $o{$k} = $o{$k}->text if ref($o{$k});
+                unless (defined $o{$k}) {
+                    delete $o{$k};
+                    next;
+                }
+
+                $o{$k} = $o{$k}->all_text() if ref($o{$k});
+                $o{$k} =~ s/\A\s+//;
+                $o{$k} =~ s/\s+\z//;
                 $o{$k} =~ s/\s+/ /g;
             }
+
+            return unless defined($o{title}) && $o{title} ne '';
+
             push @rows, \%o;
         }
     );
