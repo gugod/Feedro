@@ -26,8 +26,10 @@ sub fetch_feed_items {
         sub {
             my $el = $_;
             push @rows, {
-                title => $el->at("title")->text,
-                url   => $el->at("link")->text,
+                title => $el->at("title"),
+                url   => $el->at("link"),
+                date_published => $el->at("date"),
+                content_text => $el->at("description"),
             };
         }
     );
@@ -48,29 +50,31 @@ sub fetch_feed_items {
                 $o{content_text} = delete $o{summary};
             }
 
-            for my $k (keys %o) {
-                unless (defined $o{$k}) {
-                    delete $o{$k};
-                    next;
-                }
-
-                $o{$k} = $o{$k}->all_text() if ref($o{$k});
-                $o{$k} =~ s/\A\s+//;
-                $o{$k} =~ s/\s+\z//;
-                $o{$k} =~ s/\s+/ /g;
-            }
-
-            return unless defined($o{title}) && $o{title} ne '';
-
             push @rows, \%o;
         }
     );
+
+    for my $o (@rows) {
+        for my $k (keys %$o) {
+            unless (defined $o->{$k}) {
+                delete $o->{$k};
+                next;
+            }
+
+            $o->{$k} = $o->{$k}->all_text() if ref($o->{$k});
+            $o->{$k} =~ s/\A\s+//;
+            $o->{$k} =~ s/\s+\z//;
+            $o->{$k} =~ s/\s+/ /g;
+        }
+    }
 
     my %seen;
     @rows = map {
         $_->{id} = sha1_hex( $_->{url} . "\n" . encode_utf8($_->{title}) );
         $_;
-    } grep { !$seen{ $_->{url} } } @rows;
+    } grep {
+        $_->{url} && $_->{title} &&  !$seen{ $_->{url} }
+    } @rows;
 
     return \@rows;
 }
