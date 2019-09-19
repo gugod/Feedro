@@ -33,6 +33,17 @@ sub token_in_request_header {
     return '';
 }
 
+sub save_tokens {
+    return unless FEEDRO_STORAGE_DIR;
+
+    for my $id ( keys %tokens ) {
+        my $str = $tokens{$id};
+        path( FEEDRO_STORAGE_DIR, "${id}.token.txt" )->spew_utf8($str);
+    }
+
+    return;
+}
+
 sub save_feeds {
     return unless FEEDRO_STORAGE_DIR;
 
@@ -41,12 +52,21 @@ sub save_feeds {
         path( FEEDRO_STORAGE_DIR, "${id}.json" )->spew_utf8($str);
     }
 
-    for my $id ( keys %tokens ) {
-        my $str = $tokens{$id};
-        path( FEEDRO_STORAGE_DIR, "${id}.token.txt" )->spew_utf8($str);
-    }
-
     return;
+}
+
+sub load_tokens {
+    return unless FEEDRO_STORAGE_DIR;
+    path(FEEDRO_STORAGE_DIR)->mkpath();
+    path(FEEDRO_STORAGE_DIR)->visit(
+        sub {
+            my ($path) = @_;
+            return unless $path =~ /\.token.txt$/;
+            my $id       = $path->basename('.token.txt');
+            $tokens{$id} = $path->slurp();
+        },
+        { recurse => 0, follow_symlinks => 0 },
+    );
 }
 
 sub load_feeds {
@@ -107,6 +127,7 @@ sub create_feed {
     );
     my $token = $tokens{$id} = sha1_base64( join "\n", time, rand(), $id );
     save_feeds();
+    save_tokens();
 
     return { identifier => $id, token => $token };
 }
@@ -233,5 +254,6 @@ get '/feed/:identifier' => sub {
     );
 };
 
+load_tokens();
 load_feeds();
 app->start;
