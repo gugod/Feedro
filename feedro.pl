@@ -8,6 +8,7 @@ use Digest::SHA1 qw<sha1_hex>;
 use Data::UUID;
 use Path::Tiny qw< path >;
 use Data::Dumper;
+use List::Util qw< any >;
 
 use constant {
     FEEDRO_STORAGE_DIR => $ENV{FEEDRO_STORAGE_DIR} // '',
@@ -16,6 +17,7 @@ use constant {
     ERROR_TOKEN_INVALID => "Token is invalid",
     ERROR_FEED_ID_UNKNOWN => "Unknown feed id",
     ERROR_FEED_CREATION_FAIL => "Feed creation failed",
+    ERROR_INSUFFICIENT => "Insufficient",
 };
 
 # Storage
@@ -114,13 +116,15 @@ sub append_item {
     my $feed = $feeds{$feed_id};
     return { error => ERROR_FEED_ID_UNKNOWN } unless $feed;
     return { error => ERROR_TOKEN_INVALID } if $token ne $tokens{$feed_id};
+    return { error => ERROR_INSUFFICIENT } if $item->{content_text} && $item->{title};
 
     $item->{id} //= Data::UUID->new->create_str();
-    $item->{content_text} //= '';
-    $item->{title} //= 'Meaningless Title';
+
+    if ( any { $_->{id} eq $item->{id} } @{ $feed->feed->{items} } ) {
+        return {};
+    }
 
     $feed->add_item(%$item);
-
     if ( @{ $feed->feed->{items} } > 1000 ) {
         shift @{ $feed->feed->{items} };
     }
