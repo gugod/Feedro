@@ -41,6 +41,7 @@ sub fetch_feed_items {
                 url          => $el->at("link")->attr("href"),
                 summary      => $el->at("summary"),
                 content_text => $el->at("content"),
+                date_published => $el->at("published"),
             );
 
             if (!defined($o{content_text}) && defined($o{summary})) {
