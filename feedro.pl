@@ -3,12 +3,12 @@ use v5.18;
 use strict;
 use warnings;
 use Mojolicious::Lite;
+use Mojo::Collection;
 use JSON::Feed;
 use Digest::SHA1 qw<sha1_hex>;
 use Data::UUID;
 use Path::Tiny qw< path >;
 use Data::Dumper;
-use List::Util qw< any >;
 
 use constant {
     FEEDRO_STORAGE_DIR => $ENV{FEEDRO_STORAGE_DIR} // '',
@@ -118,10 +118,10 @@ sub append_item {
     return { error => ERROR_TOKEN_INVALID } if $token ne $tokens{$feed_id};
     return { error => ERROR_INSUFFICIENT } if $item->{content_text} && $item->{title};
 
-    $item->{id} //= Data::UUID->new->create_str();
-
-    if ( any { $_->{id} eq $item->{id} } @{ $feed->feed->{items} } ) {
+    if ( $item->{id} && Mojo::Collection->new(@{ $feed->feed->{items} })->first(sub { $_->{id} eq $item->{id} }) ) {
         return {};
+    } else {
+        $item->{id} = Data::UUID->new->create_str();
     }
 
     $feed->add_item(%$item);
