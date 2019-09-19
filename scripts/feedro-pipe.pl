@@ -2,9 +2,10 @@
 use v5.18;
 use strict;
 use warnings;
-use Encode qw< decode_utf8 >;
+use Encode qw< encode_utf8 decode_utf8 >;
 use Mojo::UserAgent;
 use Getopt::Long qw< GetOptions >;
+use Digest::SHA1 qw< sha1_hex >;
 use JSON;
 use Data::UUID;
 use XML::Loy;
@@ -63,6 +64,12 @@ sub fetch_feed_items {
             push @rows, \%o;
         }
     );
+
+    my %seen;
+    @rows = map {
+        $_->{id} = sha1_hex( $_->{url} . "\n" . encode_utf8($_->{title}) );
+        $_;
+    } grep { !$seen{ $_->{url} } } @rows;
 
     return \@rows;
 }
