@@ -136,7 +136,7 @@ sub append_item {
     my ($feed_id, $item, $token) = @_;
     my $feed = $feeds{$feed_id};
     return { error => ERROR_FEED_ID_UNKNOWN } unless $feed;
-    return { error => ERROR_TOKEN_INVALID } if $token ne $tokens{$feed_id};
+    return { error => ERROR_TOKEN_INVALID } if $tokens{$feed_id} && $token ne $tokens{$feed_id};
     return { error => ERROR_INSUFFICIENT } unless $item->{content_text} || $item->{title};
 
     if ( $item->{id} && Mojo::Collection->new(@{ $feed->feed->{items} })->first(sub { $_->{id} eq $item->{id} }) ) {
