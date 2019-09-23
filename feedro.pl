@@ -9,7 +9,6 @@ use XML::FeedPP; # Implies: XML::FeedPP::RSS, XML::FeedPP::Atom::Atom10;
 use Digest::SHA1 qw<sha1_hex>;
 use Data::UUID;
 use Path::Tiny qw< path >;
-use Data::Dumper;
 
 use constant {
     FEEDRO_STORAGE_DIR => $ENV{FEEDRO_STORAGE_DIR} // '',
