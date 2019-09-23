@@ -242,14 +242,30 @@ del '/feed/:identifier/items' => sub {
 get '/feed/:identifier' => sub {
     my ($c)  = @_;
     my $id   = $c->param('identifier');
-    my $feed = $feeds{$id};
-    unless ($feed) {
-        $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN } );
-        return;
+
+    my ($feed, $feed_file);
+    if (FEEDRO_STORAGE_DIR) {
+        $feed_file = path( FEEDRO_STORAGE_DIR, "${id}.json" );
+        unless ( $feed_file->is_file ) {
+            $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN } );
+            return;
+        }
+    } else {
+        $feed = $feeds{$id};
+        unless ($feed) {
+            $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN } );
+            return;
+        }
     }
 
     $c->respond_to(
-        json => sub { $c->render( text => $feed->to_string ) },
+        json => sub {
+            if ($feed_file) {
+                $c->reply->file( $feed_file );
+            } else {
+                $c->render( text => $feed->to_string );
+            }
+        },
         any  => { data => '', status => 404 },
     );
 };
