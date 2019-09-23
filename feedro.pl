@@ -5,6 +5,7 @@ use warnings;
 use Mojolicious::Lite;
 use Mojo::Collection;
 use JSON::Feed;
+use XML::FeedPP; # Implies: XML::FeedPP::RSS, XML::FeedPP::Atom::Atom10;
 use Digest::SHA1 qw<sha1_hex>;
 use Data::UUID;
 use Path::Tiny qw< path >;
@@ -154,6 +155,24 @@ sub append_item {
     return {};
 }
 
+sub load_xml_feed_from_json_feed {
+    my ($xml_feed, $json_feed) = @_;
+
+    $xml_feed->title( $json_feed->get('title') );
+    $xml_feed->description( $json_feed->get('description') );
+
+    # XXX: Leaky abstraction.
+    for my $item (@{ $json_feed->get('items') }) {
+        $xml_feed->add_item(
+            id => $item->{id},
+            link => $item->{url},
+            title => $item->{title},
+            description => ($item->{content_html} // $item->{content_text}),
+        );
+    }
+    return;
+}
+
 # Actions
 
 ## API: Feed creation
@@ -244,15 +263,15 @@ get '/feed/:identifier' => sub {
     my $id   = $c->param('identifier');
 
     my ($feed, $feed_file);
+
+    unless ($feed = $feeds{$id}) {
+        $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN } );
+        return;
+    }
+
     if (FEEDRO_STORAGE_DIR) {
         $feed_file = path( FEEDRO_STORAGE_DIR, "${id}.json" );
         unless ( $feed_file->is_file ) {
-            $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN } );
-            return;
-        }
-    } else {
-        $feed = $feeds{$id};
-        unless ($feed) {
             $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN } );
             return;
         }
@@ -265,6 +284,16 @@ get '/feed/:identifier' => sub {
             } else {
                 $c->render( text => $feed->to_string );
             }
+        },
+        atom => sub {
+            my $xml_feed = XML::FeedPP::Atom::Atom10->new;
+            load_xml_feed_from_json_feed( $xml_feed, $feed );
+            $c->render( text => $xml_feed->to_string );
+        },
+        rss => sub {
+            my $xml_feed = XML::FeedPP::RSS->new;
+            load_xml_feed_from_json_feed( $xml_feed, $feed );
+            $c->render( text => $xml_feed->to_string );
         },
         any  => { data => '', status => 404 },
     );
