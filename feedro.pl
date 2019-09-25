@@ -102,6 +102,12 @@ sub is_prime {
     return 1;
 }
 
+sub encode_utf8 {
+    my $s = $_[0] . "";
+    utf8::encode($s);
+    return $s;
+}
+
 sub proof_looks_ok {
     my ($req) = @_;
 
@@ -113,7 +119,8 @@ sub proof_looks_ok {
 
     my $now = time();
     return 0 if ($now < $t || $now - $t > 3600 || !is_prime($p));
-    my $h = sha1_hex(join "\n", $title, $description, $t, $p);
+    
+    my $h = sha1_hex(encode_utf8(join "\n", $title, $description, $t, $p));
     return ($h eq $sha1 && substr($h, 0, 4) eq "feed");
 }
 

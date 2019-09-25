@@ -21,28 +21,39 @@ sub next_prime {
     return $n;
 }
 
+sub encode_utf8 {
+    my $s = $_[0] . "";
+    utf8::encode($s);
+    return $s;
+}
+
 sub proof {
     my ($title, $description) = @_;
 
     my $t = time();
     my $prime = 2;
-    my $h = sha1_hex(join "\n", $title, $description, $t, $prime);
+
+    my $h = sha1_hex(encode_utf8(join "\n", $title, $description, $t, $prime));
     while ( substr($h,0,4) ne "feed" ) {
         $prime = next_prime($prime);
-        $h = sha1_hex(join "\n", $title, $description, $t, $prime);
+        $h = sha1_hex(encode_utf8(join "\n", $title, $description, $t, $prime));
     }
     return [ $t, $prime, $h ];
 }
 
 sub feedro_create_feed {
     my ($feedro, $title, $description) = @_;
+    utf8::decode($title);
+    utf8::decode($description);
+
+    my $proof = proof( $title, $description );
     my $ua = Mojo::UserAgent->new();
     my $tx = $ua->post(
         $feedro . "/feed/",
         json => {
             title => $title,
             description => $description,
-            proof => proof( $title, $description ),
+            proof => $proof,
         }
     );
     my $res = $tx->result;
