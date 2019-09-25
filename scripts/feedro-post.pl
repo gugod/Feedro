@@ -5,7 +5,6 @@ use warnings;
 use Mojo::UserAgent;
 use Getopt::Long qw< GetOptions >;
 use JSON qw< encode_json >;
-use Data::UUID;
 use Data::Dumper qw< Dumper >;
 
 my %opts;
@@ -23,13 +22,13 @@ die "`token` is required.\n" unless $opts{token};
 
 my %item;
 
-$item{id} = Data::UUID->new->create_str;
-
 for my $k (qw<title url content_text>) {
     next unless exists $opts{$k};
     $item{$k} = $opts{$k};
     utf8::decode( $item{$k} );
 }
+
+$item{id} = $item{url} if $item{url};
 
 $feed_url =~ s{\.json}{/items};
 
