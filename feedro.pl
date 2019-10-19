@@ -146,7 +146,10 @@ sub append_item {
     return { error => ERROR_TOKEN_INVALID } if $tokens{$feed_id} && $token ne $tokens{$feed_id};
     return { error => ERROR_INSUFFICIENT } unless $item->{content_text} || $item->{title};
 
-    if ( $item->{id} && Mojo::Collection->new(@{ $feed->feed->{items} })->first(sub { $_->{id} eq $item->{id} }) ) {
+    my $col = Mojo::Collection->new(@{ $feed->feed->{items} });
+    if ( $item->{id} && $col->first(sub { $_->{id} eq $item->{id} }) ) {
+        return {};
+    } elsif ( $item->{url} && $col->first(sub { $_->{link} eq $item->{url} }) ) {
         return {};
     } else {
         $item->{id} = Data::UUID->new->create_str();
