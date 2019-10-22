@@ -10,6 +10,30 @@ Feedro is a dead-simple service that allow clients to:
 4. remove all items from the given feed
 5. Retrieve the feed in the format of JSON Feed or others.
 
+## Installation
+
+A standalone Feedro instance can be installed by cpm (or Carton)
+
+    cpm install
+
+This would install all dependencies under `local/` directory.
+
+
+## Launch the daemon
+
+Once installed, it can be started by:
+
+    perl -Mlib=local/lib/perl5  ./feedro.pl daemon
+
+This starts the built-in http server in development mode, by default, at port 3000.
+
+    [2019-10-22 15:32:30.54392] [19440] [info] Listening at "http://*:3000"
+    Server available at http://127.0.0.1:3000
+
+## Deployment
+
+(To be written)
+
 ## API
 
 ### 1. Feed creation
