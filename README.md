@@ -24,14 +24,15 @@ Such as:
         proof: [1568462482, 1559113, "feedf5dd6aac2f6c0b0bbd01f7301d8e6b4b8a26"]
     }
 
-The values inside the "proof" array are: a timestamp, a prime number, and a sha1 of:
+The values inside the "proof" array are: an unix timestamp as an integer, a
+prime number, and a sha1 of:
 
     title ~ "\n" ~ description ~ "\n" ~ timestamp ~ "\n" ~ prime_number
 
-The "~" above means string concatenation. Both timestamp and the prime_number
-are represented in decimal positive integers. Timestamp should be in the range
-of 3600s ago to present, relative to the server time. Feedro server would
-create the feed only if the proof is valid.
+The "~" operator above denotes string concatenation. Both timestamp and the
+prime_number are represented in decimal positive integers. Timestamp should be
+within the range from 3600s ago to present, judged by the Feedro
+server. Feedro server create the feed only if the proof is verified.
 
 Upon creation failures, the server returns 400 status code, with
 a "error" message describing what might be wrong:
@@ -48,11 +49,12 @@ as well as a token:
         "token": "ZHTQ1e5J0uNGw3Gynp-BcWmaY24"
     }
 
-Both piece of information must be preserved by the client side.
+Client must preserve both identifier and token, as they are required for
+future communication.
 
-Identifier is used in the URL to append a new item to a feed.  Token must be
-provided for all other requests in the HTTP authentication header as a "Bearer
-token". With the example above, the line of such header would be this:
+The identifier is used in the URL of the feed. Token must be provided for all
+other requests in the HTTP authentication header as a "Bearer token". With the
+example above, the line of such header would be this:
 
     Authentication: Bearer ZHTQ1e5J0uNGw3Gynp-BcWmaY24
 
