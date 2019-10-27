@@ -1,8 +1,11 @@
 FROM perl:5.30
+RUN cpanm -q -n --no-man-pages App::cpm
 
-ADD [".", "/app"]
-RUN cpanm -q -n --no-man-pages App::cpm &&  cd /src && cpm install -g && cpm install -g . && rm -rf /root/.perl-cpm /root/.cpanm
-
+COPY [".", "/app"]
 WORKDIR /app
-CMD perl feedro.pl daemon
 
+RUN cpm install -g
+RUN rm -rf /root/.perl-cpm /root/.cpanm
+
+EXPOSE 3000
+CMD perl feedro.pl daemon
