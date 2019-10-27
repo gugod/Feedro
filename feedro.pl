@@ -149,7 +149,7 @@ sub append_item {
     my $col = Mojo::Collection->new(@{ $feed->feed->{items} });
     if ( $item->{id} && $col->first(sub { $_->{id} eq $item->{id} }) ) {
         return {};
-    } elsif ( $item->{url} && $col->first(sub { $_->{link} eq $item->{url} }) ) {
+    } elsif ( $item->{url} && $col->first(sub { $_->{url} eq $item->{url} }) ) {
         return {};
     } else {
         $item->{id} = Data::UUID->new->create_str();
