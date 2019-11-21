@@ -224,9 +224,9 @@ put '/feed/:identifier' => sub {
 
 post '/feed/:identifier/items' => sub {
     my ($c)  = @_;
-    my $id   = $c->param('identifier');
+    my $feed_id   = $c->param('identifier');
 
-    my $feed = $feeds{$id};
+    my $feed = $feeds{$feed_id};
     unless ($feed) {
         $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN });
         return;
@@ -243,7 +243,7 @@ post '/feed/:identifier/items' => sub {
     }
 
     my $token = token_in_request_header($c);
-    my $result = append_item( $id, $item, $token );
+    my $result = append_item( $feed_id, $item, $token );
     if ($result->{error}) {
         my $code = ($result->{error} eq ERROR_TOKEN_INVALID) ? 401 : 400;
         $c->render( status => $code, json => $result );
