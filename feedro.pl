@@ -45,11 +45,18 @@ sub save_tokens {
 }
 
 sub save_feeds {
+    my ($feed_id) = @_;
+
     return unless FEEDRO_STORAGE_DIR;
 
-    for my $id ( keys %feeds ) {
+    my @to_save = ($feed_id);
+    @to_save == (keys %feeds) unless @to_save;
+
+    for my $id ( @to_save ) {
         my $str = $feeds{$id}->to_string;
         path( FEEDRO_STORAGE_DIR, "${id}.json" )->spew_utf8($str);
+        path( FEEDRO_STORAGE_DIR, "${id}.atom" )->remove;
+        path( FEEDRO_STORAGE_DIR, "${id}.rss" )->remove;
     }
 
     return;
@@ -160,7 +167,7 @@ sub append_item {
         shift @{ $feed->feed->{items} };
     }
 
-    save_feeds();
+    save_feeds( $feed_id );
     return {};
 }
 
@@ -295,14 +302,28 @@ get '/feed/:identifier' => sub {
             }
         },
         atom => sub {
-            my $xml_feed = XML::FeedPP::Atom::Atom10->new;
-            load_xml_feed_from_json_feed( $xml_feed, $feed );
-            $c->render( text => $xml_feed->to_string );
+            my $xml_feed_file =  path( FEEDRO_STORAGE_DIR, "${id}.atom" );
+
+            if ( $xml_feed_file->is_file ) {
+                $c->reply->file( $xml_feed_file );
+
+            } else {
+                my $xml_feed = XML::FeedPP::Atom::Atom10->new;
+                load_xml_feed_from_json_feed( $xml_feed, $feed );
+                $c->render( text => $xml_feed->to_string );
+                $xml_feed_file->spew( $xml_feed->to_string );
+            }
         },
         rss => sub {
-            my $xml_feed = XML::FeedPP::RSS->new;
-            load_xml_feed_from_json_feed( $xml_feed, $feed );
-            $c->render( text => $xml_feed->to_string );
+            my $xml_feed_file =  path( FEEDRO_STORAGE_DIR, "${id}.rss" );
+            if ( $xml_feed_file->is_file ) {
+                $c->reply->file( $xml_feed_file );
+            } else {
+                my $xml_feed = XML::FeedPP::RSS->new;
+                load_xml_feed_from_json_feed( $xml_feed, $feed );
+                $c->render( text => $xml_feed->to_string );
+                $xml_feed_file->spew( $xml_feed->to_string );
+            }
         },
         any  => { data => '', status => 404 },
     );
