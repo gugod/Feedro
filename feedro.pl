@@ -11,7 +11,7 @@ use Data::UUID;
 use Path::Tiny qw< path >;
 
 use constant {
-    FEEDRO_STORAGE_DIR => $ENV{FEEDRO_STORAGE_DIR} // '',
+    FEEDRO_STORAGE_DIR => $ENV{FEEDRO_STORAGE_DIR} // '/tmp/feedro/',
 
     ERROR_PROOF_IS_NOT_GOOD => "Proof is not good",
     ERROR_TOKEN_INVALID => "Token is invalid",
@@ -34,8 +34,6 @@ sub token_in_request_header {
 }
 
 sub save_tokens {
-    return unless FEEDRO_STORAGE_DIR;
-
     for my $id ( keys %tokens ) {
         my $str = $tokens{$id};
         path( FEEDRO_STORAGE_DIR, "${id}.token.txt" )->spew_utf8($str);
@@ -47,10 +45,7 @@ sub save_tokens {
 sub save_feeds {
     my ($feed_id) = @_;
 
-    return unless FEEDRO_STORAGE_DIR;
-
-    my @to_save = ($feed_id);
-    @to_save = (keys %feeds) unless @to_save;
+    my @to_save = $feed_id ? ($feed_id) : (keys %feeds);
 
     for my $id ( @to_save ) {
         my $str = $feeds{$id}->to_string;
@@ -63,7 +58,6 @@ sub save_feeds {
 }
 
 sub load_tokens {
-    return unless FEEDRO_STORAGE_DIR;
     path(FEEDRO_STORAGE_DIR)->mkpath();
     path(FEEDRO_STORAGE_DIR)->visit(
         sub {
@@ -77,7 +71,6 @@ sub load_tokens {
 }
 
 sub load_feeds {
-    return unless FEEDRO_STORAGE_DIR;
     path(FEEDRO_STORAGE_DIR)->mkpath();
     path(FEEDRO_STORAGE_DIR)->visit(
         sub {
@@ -285,12 +278,10 @@ get '/feed/:identifier' => sub {
         return;
     }
 
-    if (FEEDRO_STORAGE_DIR) {
-        $feed_file = path( FEEDRO_STORAGE_DIR, "${id}.json" );
-        unless ( $feed_file->is_file ) {
-            $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN } );
-            return;
-        }
+    $feed_file = path( FEEDRO_STORAGE_DIR, "${id}.json" );
+    unless ( $feed_file->is_file ) {
+        $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN } );
+        return;
     }
 
     $c->respond_to(
