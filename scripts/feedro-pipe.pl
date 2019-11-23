@@ -9,9 +9,18 @@ use Digest::SHA1 qw< sha1_hex >;
 use JSON;
 use Data::UUID;
 use XML::Loy;
+use NewsExtractor;
+
+sub extract_fulltext {
+    my ($url) = @_;
+    my ($error, $article) = NewsExtractor->new( url => $url )->download->parse;
+    return if $error;
+
+    return ($article->headline, $article->article_body);
+}
 
 sub fetch_feed_items {
-    my ($url) = @_;
+    my ($url, $extract_fulltext) = @_;
 
     my $ua = Mojo::UserAgent->new;
     my $tx = $ua->get($url);
@@ -20,12 +29,12 @@ sub fetch_feed_items {
 
     my $xml = XML::Loy->new($body);
 
-    my @rows;
+    my @items;
     # rss
     $xml->find("item")->each(
         sub {
             my $el = $_;
-            push @rows, {
+            push @items, {
                 title => $el->at("title"),
                 url   => $el->at("link"),
                 date_published => $el->at("date"),
@@ -50,11 +59,11 @@ sub fetch_feed_items {
                 $o{content_text} = delete $o{summary};
             }
 
-            push @rows, \%o;
+            push @items, \%o;
         }
     );
 
-    for my $o (@rows) {
+    for my $o (@items) {
         for my $k (keys %$o) {
             unless (defined $o->{$k}) {
                 delete $o->{$k};
@@ -69,21 +78,51 @@ sub fetch_feed_items {
     }
 
     my %seen;
-    @rows = map {
+    @items = map {
         $_->{id} = sha1_hex( $_->{url} . "\n" . encode_utf8($_->{title}) );
         $_;
     } grep {
         $_->{url} && $_->{title} &&  !$seen{ $_->{url} }
-    } @rows;
+    } @items;
 
-    return \@rows;
+    if ( $extract_fulltext ) {
+        for my $item (@items) {
+            my ($title, $content) =  extract_fulltext( $item->{url} );
+            if (defined($title) && defined($content)) {
+                $item->{title} = $title;
+                $item->{content_text} = $content;
+            }
+        }
+    }
+
+    return \@items;
+}
+
+sub post_to_feedro {
+    my ($feed_url, $token, $items) = @_;
+
+    my $ua = Mojo::UserAgent->new;
+    for my $item (@$items) {
+        my $tx = $ua->post(
+            $feed_url,
+            { Authentication => "Bearer $token" },
+            json => $item,
+        );
+        my $res = $tx->result;
+        unless ($res->is_success) {
+            say "Error: " . $res->message;
+            say "\t" . $res->code;
+            say "\t" . $res->body;
+        }
+    }
 }
 
 my %opts;
 GetOptions(
     \%opts,
     "from=s",
-    "token=s"
+    "token=s",
+    "extract-fulltext",
 );
 
 my $feed_url = $ARGV[0] or die "A feed URL is required.";
@@ -93,20 +132,6 @@ for (qw< from token >) {
     die "`$_` is required.\n" unless $opts{$_};
 }
 
-my @items = @{ fetch_feed_items($opts{from}) };
+my @items = @{ fetch_feed_items($opts{from}, $opts{"extract-fulltext"}) };
 
-my $ua = Mojo::UserAgent->new;
-for my $item (@items) {
-    my $tx = $ua->post(
-        $feed_url,
-        { Authentication => "Bearer $opts{token}" },
-        json => $item,
-    );
-    my $res = $tx->result;
-
-    unless ($res->is_success) {
-        say "Error: " . $res->message;
-        say "\t" . $res->code;
-        say "\t" . $res->body;
-    }
-}
+post_to_feedro($feed_url, $opts{token}, \@items);
