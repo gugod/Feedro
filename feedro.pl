@@ -50,7 +50,7 @@ sub save_feeds {
     return unless FEEDRO_STORAGE_DIR;
 
     my @to_save = ($feed_id);
-    @to_save == (keys %feeds) unless @to_save;
+    @to_save = (keys %feeds) unless @to_save;
 
     for my $id ( @to_save ) {
         my $str = $feeds{$id}->to_string;
