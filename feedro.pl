@@ -45,13 +45,24 @@ sub save_tokens {
 sub save_feeds {
     my ($feed_id) = @_;
 
-    my @to_save = $feed_id ? ($feed_id) : (keys %feeds);
+    for my $id ( keys %feeds ) {
+        my $feed = $feeds{$id}{__json_feed_obj} or next;
 
-    for my $id ( @to_save ) {
-        my $str = $feeds{$id}->to_string;
+        my $str = $feed->to_string;
         path( FEEDRO_STORAGE_DIR, "${id}.json" )->spew_utf8($str);
-        path( FEEDRO_STORAGE_DIR, "${id}.atom" )->remove;
-        path( FEEDRO_STORAGE_DIR, "${id}.rss" )->remove;
+
+        my @xml_feeds = (
+            [ XML::FeedPP::Atom::Atom10->new(), path( FEEDRO_STORAGE_DIR, "${id}.atom" ) ],
+            [ XML::FeedPP::RSS->new(), path( FEEDRO_STORAGE_DIR, "${id}.rss" ) ],
+        );
+
+        for my $el (@xml_feeds) {
+            my ($xml_feed, $path) = @$el;
+            load_xml_feed_from_json_feed( $xml_feed, $feed );
+            $path->spew( $xml_feed->to_string );
+        }
+
+        delete $feeds{$id}{__json_feed_obj};
     }
 
     return;
@@ -75,15 +86,14 @@ sub load_feeds {
     path(FEEDRO_STORAGE_DIR)->visit(
         sub {
             my ($path) = @_;
-            return unless $path =~ /\.json$/;
-            my $id      = $path->basename('.json');
-            my $content = $path->slurp();
-            $feeds{$id} = JSON::Feed->parse( \$content );
+            return unless $path =~ /\.(atom|rss|json)$/;
+            my $fmt = $1;
+            my $id = $path->basename(".${fmt}");
+            $feeds{$id}{$fmt}{path} = $path;
         },
         { recurse => 0, follow_symlinks => 0 },
     );
 }
-
 
 sub sha1_base64 {
     my ($x) = @_;
@@ -128,7 +138,7 @@ sub create_feed {
     my $req = $_[0];
     my $id = Data::UUID->new->create_str();
 
-    $feeds{$id} = JSON::Feed->new(
+    $feeds{$id}{__json_feed_obj} = JSON::Feed->new(
         title => $req->{title},
         description => $req->{description}
     );
@@ -141,10 +151,12 @@ sub create_feed {
 
 sub append_item {
     my ($feed_id, $item, $token) = @_;
-    my $feed = $feeds{$feed_id};
-    return { error => ERROR_FEED_ID_UNKNOWN } unless $feed;
+
+    return { error => ERROR_FEED_ID_UNKNOWN } unless $feeds{$feed_id};
     return { error => ERROR_TOKEN_INVALID } if $tokens{$feed_id} && $token ne $tokens{$feed_id};
     return { error => ERROR_INSUFFICIENT } unless $item->{content_text} || $item->{title};
+
+    my $feed = $feeds{$feed_id}{__json_feed_obj} = JSON::Feed->parse( "". $feeds{$feed_id}{json}{path} );
 
     my $col = Mojo::Collection->new(@{ $feed->feed->{items} });
     if ( $item->{id} && $col->first(sub { $_->{id} eq $item->{id} }) ) {
@@ -160,7 +172,7 @@ sub append_item {
         shift @{ $feed->feed->{items} };
     }
 
-    save_feeds( $feed_id );
+    save_feeds();
     return {};
 }
 
@@ -209,7 +221,7 @@ put '/feed/:identifier' => sub {
     my ($c)  = @_;
     my $id   = $c->param('identifier');
     my $feed = $c->req->json;
-    $feeds{$id} = JSON::Feed->new(%$feed);
+    $feeds{$id}{__json_feed_obj} = JSON::Feed->new(%$feed);
     save_feeds();
 
     $c->render( json => { "ok" => \1 } );
@@ -219,8 +231,7 @@ post '/feed/:identifier/items' => sub {
     my ($c)  = @_;
     my $feed_id   = $c->param('identifier');
 
-    my $feed = $feeds{$feed_id};
-    unless ($feed) {
+    unless ($feeds{$feed_id}) {
         $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN });
         return;
     }
@@ -278,43 +289,15 @@ get '/feed/:identifier' => sub {
         return;
     }
 
-    $feed_file = path( FEEDRO_STORAGE_DIR, "${id}.json" );
-    unless ( $feed_file->is_file ) {
-        $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN } );
-        return;
-    }
-
     $c->respond_to(
         json => sub {
-            if ($feed_file) {
-                $c->reply->file( $feed_file );
-            } else {
-                $c->render( text => $feed->to_string );
-            }
+            $c->reply->file( $feeds{$id}{json}{path} );
         },
         atom => sub {
-            my $xml_feed_file =  path( FEEDRO_STORAGE_DIR, "${id}.atom" );
-
-            if ( $xml_feed_file->is_file ) {
-                $c->reply->file( $xml_feed_file );
-
-            } else {
-                my $xml_feed = XML::FeedPP::Atom::Atom10->new;
-                load_xml_feed_from_json_feed( $xml_feed, $feed );
-                $c->render( text => $xml_feed->to_string );
-                $xml_feed_file->spew( $xml_feed->to_string );
-            }
+            $c->reply->file( $feeds{$id}{atom}{path} );
         },
         rss => sub {
-            my $xml_feed_file =  path( FEEDRO_STORAGE_DIR, "${id}.rss" );
-            if ( $xml_feed_file->is_file ) {
-                $c->reply->file( $xml_feed_file );
-            } else {
-                my $xml_feed = XML::FeedPP::RSS->new;
-                load_xml_feed_from_json_feed( $xml_feed, $feed );
-                $c->render( text => $xml_feed->to_string );
-                $xml_feed_file->spew( $xml_feed->to_string );
-            }
+            $c->reply->file( $feeds{$id}{rss}{path} );
         },
         any  => { data => '', status => 404 },
     );
