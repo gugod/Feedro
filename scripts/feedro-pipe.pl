@@ -13,14 +13,18 @@ use NewsExtractor;
 
 sub extract_fulltext {
     my ($url) = @_;
-    my ($error, $article) = NewsExtractor->new( url => $url )->download->parse;
-    return if $error;
+    my ($error, $article);
+    eval {
+        ($error, $article) = NewsExtractor->new( url => $url )->download->parse;
+        1;
+    } or return;
 
+    return if $error;
     return ($article->headline, $article->article_body);
 }
 
 sub fetch_feed_items {
-    my ($url, $extract_fulltext) = @_;
+    my ($url, $opts, $cb) = @_;
 
     my $ua = Mojo::UserAgent->new;
     my $tx = $ua->get($url);
@@ -49,11 +53,14 @@ sub fetch_feed_items {
             my $el = $_;
             my %o = (
                 title        => $el->at("title"),
-                url          => $el->at("link")->attr("href"),
                 summary      => $el->at("summary"),
                 content_text => $el->at("content"),
                 date_published => $el->at("published"),
             );
+
+            if ($el->at("link")) {
+                $o{url} = $el->at("link")->attr("href");
+            }
 
             if (!defined($o{content_text}) && defined($o{summary})) {
                 $o{content_text} = delete $o{summary};
@@ -62,6 +69,10 @@ sub fetch_feed_items {
             push @items, \%o;
         }
     );
+
+    if ( $opts->{"ignore-items-without-url"} ) {
+        @items = grep { $_->{url} } @items;
+    }
 
     for my $o (@items) {
         for my $k (keys %$o) {
@@ -77,21 +88,19 @@ sub fetch_feed_items {
         }
     }
 
-    my %seen;
-    @items = map {
-        $_->{id} = sha1_hex( $_->{url} . "\n" . encode_utf8($_->{title}) );
-        $_;
-    } grep {
-        $_->{url} && $_->{title} &&  !$seen{ $_->{url} }
-    } @items;
-
-    if ( $extract_fulltext ) {
-        for my $item (@items) {
+    if ( $opts->{'extract-fulltext'} ) {
+        for my $item (grep { $_->{url} } @items) {
             my ($title, $content) =  extract_fulltext( $item->{url} );
             if (defined($title) && defined($content)) {
                 $item->{title} = $title;
                 $item->{content_text} = $content;
+
+                $cb->([ $item ]);
             }
+        }
+    } else {
+        if ($cb) {
+            $cb->(\@items);
         }
     }
 
@@ -122,6 +131,7 @@ GetOptions(
     \%opts,
     "from=s",
     "token=s",
+    "ignore-items-without-url",
     "extract-fulltext",
 );
 
@@ -132,6 +142,19 @@ for (qw< from token >) {
     die "`$_` is required.\n" unless $opts{$_};
 }
 
-my @items = @{ fetch_feed_items($opts{from}, $opts{"extract-fulltext"}) };
+fetch_feed_items(
+    $opts{from},
+    {
+        "extract-fulltext"         => $opts{"extract-fulltext"},
+        "ignore-items-without-url" => $opts{"ignore-items-without-url"}
+    },
+    sub {
+        my ($items) = @_;
 
-post_to_feedro($feed_url, $opts{token}, \@items);
+        post_to_feedro(
+            $feed_url,
+            $opts{token},
+            $items,
+        );
+    }
+);
