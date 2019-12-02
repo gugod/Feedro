@@ -152,7 +152,7 @@ for (qw< from token >) {
     die "`$_` is required.\n" unless $opts{$_};
 }
 
-my $existing_items = fetch_feed_items($opts{to}, {}, undef);
+my $existing_items = $opts{"extract-fulltext"} ? fetch_feed_items($opts{to}, {}, undef) : undef;
 
 fetch_feed_items(
     $opts{from},
