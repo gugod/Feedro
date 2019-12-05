@@ -49,7 +49,7 @@ sub feedro_create_feed {
     my $proof = proof( $title, $description );
     my $ua = Mojo::UserAgent->new();
     my $tx = $ua->post(
-        $feedro . "/feed/",
+        $feedro,
         json => {
             title => $title,
             description => $description,
