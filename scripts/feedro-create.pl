@@ -42,7 +42,13 @@ sub proof {
 }
 
 sub feedro_create_feed {
-    my ($feedro, $title, $description) = @_;
+    my ($opts) = @_;
+
+    my $feedro = $opts->{feedro};
+    my $title  = $opts->{title};
+    my $description = $opts->{description};
+    my $id = $opts->{id};
+
     utf8::decode($title);
     utf8::decode($description);
 
@@ -51,6 +57,9 @@ sub feedro_create_feed {
     my $tx = $ua->post(
         $feedro,
         json => {
+            defined($id) ? (
+                id => $id,
+            ):(),
             title => $title,
             description => $description,
             proof => $proof,
@@ -63,6 +72,7 @@ sub feedro_create_feed {
 my %opts;
 GetOptions(
     \%opts,
+    "id=s",
     "title=s",
     "description=s",
     "feedro=s",
@@ -70,4 +80,4 @@ GetOptions(
 
 die "Requires all off '--title', '--description', and '--feedro'" unless $opts{title} && $opts{description} && $opts{feedro};
 
-feedro_create_feed( $opts{feedro}, $opts{title}, $opts{description} );
+feedro_create_feed( \%opts );
