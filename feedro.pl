@@ -136,7 +136,16 @@ sub proof_looks_ok {
 
 sub create_feed {
     my $req = $_[0];
-    my $id = Data::UUID->new->create_str();
+    my $id;
+
+    if ($id = $req->{id}) {
+        return unless ( ($id =~ /\A[A-Za-z0-9][A-Za-z0-9\-]{14,}[A-Za-z0-9]\z/) && (not exists $feeds{$id}) );
+    } else {
+        $id = Data::UUID->new->create_str();
+        while (exists $feeds{$id}) {
+            $id = Data::UUID->new->create_str();
+        }
+    }
 
     $feeds{$id}{__json_feed_obj} = JSON::Feed->new(
         title => $req->{title},
