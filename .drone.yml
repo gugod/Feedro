@@ -5,5 +5,5 @@ steps:
   - name: Test with perl 5.28
     image: perl:5.28
     commands:
-      - cpanm --installdeps .
+      - cpanm -q --notest --installdeps .
       - yath --qvf
