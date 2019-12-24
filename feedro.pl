@@ -129,7 +129,7 @@ sub proof_looks_ok {
 
     my $now = time();
     return 0 if ($now < $t || $now - $t > 3600 || !is_prime($p));
-    
+
     my $h = sha1_hex(encode_utf8(join "\n", $title, $description, $t, $p));
     return ($h eq $sha1 && substr($h, 0, 4) eq "feed");
 }
