@@ -1,8 +1,6 @@
 #!/usr/bin/env perl
-use v5.18;
-use strict;
-use warnings;
 use Mojolicious::Lite;
+
 use Mojo::Collection;
 use JSON::Feed;
 use XML::FeedPP; # Implies: XML::FeedPP::RSS, XML::FeedPP::Atom::Atom10;
