@@ -49,14 +49,16 @@ Such as:
     }
 
 The values inside the "proof" array are: an unix timestamp as an integer, a
-prime number, and a sha1 of:
+prime number, and a sha1 digest of:
 
     title ~ "\n" ~ description ~ "\n" ~ timestamp ~ "\n" ~ prime_number
 
 The "~" operator above denotes string concatenation. Both timestamp and the
 prime_number are represented in decimal positive integers. Timestamp should be
-within the range from 3600s ago to present, judged by the Feedro
-server. Feedro server create the feed only if the proof is verified.
+within the range from 3600s ago to present judged by time on the server side.
+The sha1 must also be in lowercases and begin with string "feed".
+
+Feedro server create the feed only if the proof is verified.
 
 Upon creation failures, the server returns 400 status code, with
 a "error" message describing what might be wrong:
