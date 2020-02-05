@@ -143,7 +143,6 @@ sub append_item {
 
     return { error => ERROR_FEED_ID_UNKNOWN } unless feed_exists($feed_id);
     return { error => ERROR_TOKEN_INVALID } unless token_is_valid($feed_id, $token);
-
     return { error => ERROR_INSUFFICIENT } unless $item->{content_text} || $item->{title};
 
     my $feed = load_feed( $feed_id );
@@ -151,12 +150,11 @@ sub append_item {
     my $items = Mojo::Collection->new(@{ $feed->feed->{items} });
     if ( $item->{id} && $items->first(sub { $_->{id} eq $item->{id} }) ) {
         return {};
-    } elsif ( $item->{url} && $items->first(sub { $_->{url} eq $item->{url} }) ) {
+    } elsif ( $item->{url} && $items->first(sub { $_->{url} && ($_->{url} eq $item->{url}) }) ) {
         return {};
     } else {
         $item->{id} = Data::UUID->new->create_str();
     }
-
     $feed->add_item(%$item);
     if ( @{ $feed->feed->{items} } > 1000 ) {
         shift @{ $feed->feed->{items} };
