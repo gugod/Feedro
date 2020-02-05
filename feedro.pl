@@ -165,10 +165,10 @@ sub append_item {
 
     my $feed = $feeds{$feed_id}{__json_feed_obj} = JSON::Feed->parse( "". $feeds{$feed_id}{json}{path} );
 
-    my $col = Mojo::Collection->new(@{ $feed->feed->{items} });
-    if ( $item->{id} && $col->first(sub { $_->{id} eq $item->{id} }) ) {
+    my $items = Mojo::Collection->new(@{ $feed->feed->{items} });
+    if ( $item->{id} && $items->first(sub { $_->{id} eq $item->{id} }) ) {
         return {};
-    } elsif ( $item->{url} && $col->first(sub { $_->{url} eq $item->{url} }) ) {
+    } elsif ( $item->{url} && $items->first(sub { $_->{url} eq $item->{url} }) ) {
         return {};
     } else {
         $item->{id} = Data::UUID->new->create_str();
