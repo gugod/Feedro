@@ -82,50 +82,47 @@ sub test_failure_creation {
 sub test_item_crud {
     my $ua = Mojo::UserAgent->new();
     my $feed = test_successful_creation();
+    my ($id, $token) = ($feed->{identifier}, $feed->{token});
 
-    subtest "Attempt to add an item into the feed." => sub {
-        my ($id, $token) = ($feed->{identifier}, $feed->{token});
+    subtest "Without tokens, expect failures" => sub {
+        my $tx = $ua->post(
+            FEEDRO . "/feed/${id}/items",
+            json => {
+                title => "Some random stuff",
+                content_text => "XXX",
+                url => "https://example.com",
+            }
+        );
+        is $tx->result->code, "401",
+    };
 
-        subtest "Without tokens, expect failures" => sub {
-            my $tx = $ua->post(
-                FEEDRO . "/feed/${id}/items",
-                json => {
-                    title => "Some random stuff",
-                    content_text => "XXX",
-                    url => "https://example.com",
+    subtest "With the correct token, expect successes" => sub {
+        my $tx = $ua->post(
+            FEEDRO . "/feed/${id}/items",
+            { Authentication => "Bearer $token" },
+            json => {
+                title => "Some random stuff",
+                content_text => "XXX",
+                url => "https://example.com",
+            }
+        );
+        is $tx->result->code, "200";
+    };
+
+    subtest "With author, expect successes" => sub {
+        my $tx = $ua->post(
+            FEEDRO . "/feed/${id}/items",
+            { Authentication => "Bearer $token" },
+            json => {
+                title => "Some random stuff",
+                content_text => "XXX",
+                url => "https://example.com",
+                author => {
+                    name => "Someone",
                 }
-            );
-            is $tx->result->code, "401",
-        };
-
-        subtest "With the correct token, expect successes" => sub {
-            my $tx = $ua->post(
-                FEEDRO . "/feed/${id}/items",
-                { Authentication => "Bearer $token" },
-                json => {
-                    title => "Some random stuff",
-                    content_text => "XXX",
-                    url => "https://example.com",
-                }
-            );
-            is $tx->result->code, "200";
-        };
-
-        subtest "With author, expect successes" => sub {
-            my $tx = $ua->post(
-                FEEDRO . "/feed/${id}/items",
-                { Authentication => "Bearer $token" },
-                json => {
-                    title => "Some random stuff",
-                    content_text => "XXX",
-                    url => "https://example.com",
-                    author => {
-                        name => "Someone",
-                    }
-                }
-            );
-            is $tx->result->code, "200";
-        };
+            }
+        );
+        is $tx->result->code, "200";
     };
 
     subtest "Delete all items from the feed" => sub {

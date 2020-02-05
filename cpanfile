@@ -1,5 +1,5 @@
 requires 'Mojolicious';
-requires 'JSON::Feed';
+requires 'JSON::Feed', '1.000';
 requires 'Path::Tiny';
 requires 'Data::UUID';
 requires 'Digest::SHA1';

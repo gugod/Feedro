@@ -2,7 +2,7 @@
 use Mojolicious::Lite;
 
 use Mojo::Collection;
-use JSON::Feed;
+use JSON::Feed '1.000';
 use XML::FeedPP; # Implies: XML::FeedPP::RSS, XML::FeedPP::Atom::Atom10;
 use Digest::SHA1 qw<sha1_hex>;
 use Data::UUID;
@@ -18,10 +18,6 @@ use constant {
     ERROR_INSUFFICIENT => "Insufficient",
 };
 
-# Storage
-my %feeds;
-my %tokens;
-
 sub token_in_request_header {
     my ($c) = @_;
     my $auth = $c->req->headers->header('Authentication') // '';
@@ -31,36 +27,40 @@ sub token_in_request_header {
     return '';
 }
 
-sub save_tokens {
-    for my $id ( keys %tokens ) {
-        my $str = $tokens{$id};
-        path( FEEDRO_STORAGE_DIR, "${id}.token.txt" )->spew_utf8($str);
-    }
-
-    return;
+sub save_token {
+    my ($id, $token) = @_;
+    path( FEEDRO_STORAGE_DIR, "${id}.token.txt" )->spew_utf8($token);
 }
 
-sub save_feeds {
-    my ($feed_id) = @_;
+sub token_is_valid {
+    my ($id, $token) = @_;
+    my $stored_token = path( FEEDRO_STORAGE_DIR, "${id}.token.txt" )->slurp_utf8();
+    return ($stored_token eq $token);
+}
 
-    for my $id ( keys %feeds ) {
-        my $feed = $feeds{$id}{__json_feed_obj} or next;
+sub feed_exists {
+    my ($id) = @_;
+    return !!( path( FEEDRO_STORAGE_DIR, "${id}.json" )->exists );
+}
 
-        my $str = $feed->to_string;
-        path( FEEDRO_STORAGE_DIR, "${id}.json" )->spew_utf8($str);
+sub feed_path_json { my $id = $_[0]; path( FEEDRO_STORAGE_DIR, "${id}.json" ) }
+sub feed_path_atom { my $id = $_[0]; path( FEEDRO_STORAGE_DIR, "${id}.atom" ) }
+sub feed_path_rss  { my $id = $_[0]; path( FEEDRO_STORAGE_DIR, "${id}.rss"  ) }
 
-        my @xml_feeds = (
-            [ XML::FeedPP::Atom::Atom10->new(), path( FEEDRO_STORAGE_DIR, "${id}.atom" ) ],
-            [ XML::FeedPP::RSS->new(), path( FEEDRO_STORAGE_DIR, "${id}.rss" ) ],
-        );
+sub save_feed {
+    my ($id, $feed) = @_;
+    my $str = $feed->to_string;
+    path( FEEDRO_STORAGE_DIR, "${id}.json" )->spew_utf8($str);
 
-        for my $el (@xml_feeds) {
-            my ($xml_feed, $path) = @$el;
-            load_xml_feed_from_json_feed( $xml_feed, $feed );
-            $path->spew( $xml_feed->to_string );
-        }
+    my @xml_feeds = (
+        [ XML::FeedPP::Atom::Atom10->new(), path( FEEDRO_STORAGE_DIR, "${id}.atom" ) ],
+        [ XML::FeedPP::RSS->new(), path( FEEDRO_STORAGE_DIR, "${id}.rss" ) ],
+    );
 
-        delete $feeds{$id}{__json_feed_obj};
+    for my $el (@xml_feeds) {
+        my ($xml_feed, $path) = @$el;
+        load_xml_feed_from_json_feed( $xml_feed, $feed );
+        $path->spew( $xml_feed->to_string );
     }
 
     return;
@@ -68,29 +68,11 @@ sub save_feeds {
 
 sub load_tokens {
     path(FEEDRO_STORAGE_DIR)->mkpath();
-    path(FEEDRO_STORAGE_DIR)->visit(
-        sub {
-            my ($path) = @_;
-            return unless $path =~ /\.token.txt$/;
-            my $id       = $path->basename('.token.txt');
-            $tokens{$id} = $path->slurp();
-        },
-        { recurse => 0, follow_symlinks => 0 },
-    );
 }
 
-sub load_feeds {
-    path(FEEDRO_STORAGE_DIR)->mkpath();
-    path(FEEDRO_STORAGE_DIR)->visit(
-        sub {
-            my ($path) = @_;
-            return unless $path =~ /\.(atom|rss|json)$/;
-            my $fmt = $1;
-            my $id = $path->basename(".${fmt}");
-            $feeds{$id}{$fmt}{path} = $path;
-        },
-        { recurse => 0, follow_symlinks => 0 },
-    );
+sub load_feed {
+    my ($id) = @_;
+    return JSON::Feed->from_string( path(FEEDRO_STORAGE_DIR)->child($id . '.json')->slurp() );
 }
 
 sub sha1_base64 {
@@ -137,21 +119,21 @@ sub create_feed {
     my $id;
 
     if ($id = $req->{id}) {
-        return unless ( ($id =~ /\A[A-Za-z0-9][A-Za-z0-9\-]{14,}[A-Za-z0-9]\z/) && (not exists $feeds{$id}) );
+        return unless ($id =~ /\A[A-Za-z0-9][A-Za-z0-9\-]{14,}[A-Za-z0-9]\z/ && feed_exists($id) );
     } else {
         $id = Data::UUID->new->create_str();
-        while (exists $feeds{$id}) {
+        while ( feed_exists($id) ) {
             $id = Data::UUID->new->create_str();
         }
     }
 
-    $feeds{$id}{__json_feed_obj} = JSON::Feed->new(
+    my $feed = JSON::Feed->new(
         title => $req->{title},
         description => $req->{description}
     );
-    my $token = $tokens{$id} = sha1_base64( join "\n", time, rand(), $id );
-    save_feeds();
-    save_tokens();
+    my $token = sha1_base64( join "\n", time, rand(), $id );
+    save_feed($id, $feed);
+    save_token($id, $token);
 
     return { identifier => $id, token => $token };
 }
@@ -159,11 +141,12 @@ sub create_feed {
 sub append_item {
     my ($feed_id, $item, $token) = @_;
 
-    return { error => ERROR_FEED_ID_UNKNOWN } unless $feeds{$feed_id};
-    return { error => ERROR_TOKEN_INVALID } if $tokens{$feed_id} && $token ne $tokens{$feed_id};
+    return { error => ERROR_FEED_ID_UNKNOWN } unless feed_exists($feed_id);
+    return { error => ERROR_TOKEN_INVALID } unless token_is_valid($feed_id, $token);
+
     return { error => ERROR_INSUFFICIENT } unless $item->{content_text} || $item->{title};
 
-    my $feed = $feeds{$feed_id}{__json_feed_obj} = JSON::Feed->parse( "". $feeds{$feed_id}{json}{path} );
+    my $feed = load_feed( $feed_id );
 
     my $items = Mojo::Collection->new(@{ $feed->feed->{items} });
     if ( $item->{id} && $items->first(sub { $_->{id} eq $item->{id} }) ) {
@@ -179,7 +162,7 @@ sub append_item {
         shift @{ $feed->feed->{items} };
     }
 
-    save_feeds();
+    save_feed($feed_id, $feed);
     return {};
 }
 
@@ -227,9 +210,10 @@ post '/feed' => sub {
 put '/feed/:identifier' => sub {
     my ($c)  = @_;
     my $id   = $c->param('identifier');
-    my $feed = $c->req->json;
-    $feeds{$id}{__json_feed_obj} = JSON::Feed->new(%$feed);
-    save_feeds();
+    my $_feed = $c->req->json;
+    my $feed = JSON::Feed->new(%$_feed);
+
+    save_feed($id, $feed);
 
     $c->render( json => { "ok" => \1 } );
 };
@@ -238,7 +222,7 @@ post '/feed/:identifier/items' => sub {
     my ($c)  = @_;
     my $feed_id   = $c->param('identifier');
 
-    unless ($feeds{$feed_id}) {
+    unless ( feed_exists($feed_id) ) {
         $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN });
         return;
     }
@@ -271,20 +255,24 @@ del '/feed/:identifier/items' => sub {
     my ($c) = @_;
     my $id   = $c->param('identifier');
 
-    unless ($feeds{$id}) {
+    unless (feed_exists($id)) {
         $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN });
         return;
     }
 
     my $token = token_in_request_header($c);
-    unless ($tokens{$id} eq $token) {
+
+    unless ( token_is_valid($id, $token) ) {
         $c->render( status => 401, json => { error => ERROR_TOKEN_INVALID });
         return;
     }
 
+    my $feed = load_feed($id);
+
     # XXX: Leaky abstraction.
-    $feeds{$id}->feed->{items} = [];
-    save_feeds();
+    $feed->feed->{items} = [];
+
+    save_feed($id, $feed);
 
     $c->render( json => { ok => \1 });
 };
@@ -295,25 +283,24 @@ get '/feed/:identifier' => sub {
 
     my ($feed, $feed_file);
 
-    unless ($feed = $feeds{$id}) {
+    unless ( feed_exists($id) ) {
         $c->render( status => 404, json => { error => ERROR_FEED_ID_UNKNOWN } );
         return;
     }
 
     $c->respond_to(
         json => sub {
-            $c->reply->file( $feeds{$id}{json}{path} );
+            $c->reply->file( feed_path_json($id) );
         },
         atom => sub {
-            $c->reply->file( $feeds{$id}{atom}{path} );
+            $c->reply->file( feed_path_atom($id) );
         },
         rss => sub {
-            $c->reply->file( $feeds{$id}{rss}{path} );
+            $c->reply->file( feed_path_rss($id) );
         },
         any  => { data => '', status => 404 },
     );
 };
 
 load_tokens();
-load_feeds();
 app->start;
