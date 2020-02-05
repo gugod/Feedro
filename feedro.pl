@@ -246,9 +246,13 @@ post '/feed/:identifier/items' => sub {
     my $item = $c->req->json;
     if (!$item) {
         $item = {};
-        for my $x (qw< id title content_text url >) {
+        for my $x (qw< id title url content_text >) {
             if (my $y = $c->param($x)) {
-                $item->{$x} = "$y";
+                if ( ref($y) ) {
+                    $item->{'content_text'} = $y->slurp;
+                } else {
+                    $item->{$x} = $y;
+                }
             }
         }
     }
