@@ -51,9 +51,9 @@ sub test_successful_creation {
         my $res = $tx->result;
         $feed = $res->json;
         is $res->code, "200", "A successful code";
-        is $feed, {
-            identifier => D(),
-            token => D(),
+        is $feed, hash {
+            field identifier => D();
+            field token => D();
         }, "The structure of successful response";
     };
     return $feed;
@@ -73,8 +73,8 @@ sub test_failure_creation {
         my $res = $tx->result;
         my $feed = $res->json;
         is $res->code, "400";
-        is $feed, {
-            error => D(),
+        is $feed, hash {
+            field error => D();
         };
     };
 }
@@ -110,6 +110,22 @@ sub test_item_crud {
             );
             is $tx->result->code, "200";
         };
+
+        subtest "With author, expect successes" => sub {
+            my $tx = $ua->post(
+                FEEDRO . "/feed/${id}/items",
+                { Authentication => "Bearer $token" },
+                json => {
+                    title => "Some random stuff",
+                    content_text => "XXX",
+                    url => "https://example.com",
+                    author => {
+                        name => "Someone",
+                    }
+                }
+            );
+            is $tx->result->code, "200";
+        };
     };
 
     subtest "Delete all items from the feed" => sub {
@@ -128,9 +144,9 @@ sub test_item_crud {
                 { Authentication => "Bearer $token" }
             );
             is $tx->res->code, 200;
-            is $tx->res->json, {
-                error => DNE(),
-                ok => T(),
+            is $tx->res->json, hash {
+                field error => DNE();
+                field ok => T();
             };
         };
     };
