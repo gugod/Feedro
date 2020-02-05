@@ -2,6 +2,7 @@
 use Mojolicious::Lite;
 
 use Mojo::Collection;
+use Time::Moment;
 use JSON::Feed '1.000';
 use XML::FeedPP; # Implies: XML::FeedPP::RSS, XML::FeedPP::Atom::Atom10;
 use Digest::SHA1 qw<sha1_hex>;
@@ -155,6 +156,9 @@ sub append_item {
     } else {
         $item->{id} = Data::UUID->new->create_str();
     }
+
+    $item->{date_published} //= Time::Moment->now->strftime('%Y-%m-%dT%H:%M:%S%f%Z');
+
     $feed->add_item(%$item);
     if ( @{ $feed->feed->{items} } > 1000 ) {
         shift @{ $feed->feed->{items} };
@@ -177,6 +181,7 @@ sub load_xml_feed_from_json_feed {
             link => $item->{url},
             title => $item->{title},
             description => ($item->{content_html} // $item->{content_text}),
+            pubDate => $item->{date_published},
         );
     }
     return;

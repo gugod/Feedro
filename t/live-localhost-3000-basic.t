@@ -79,6 +79,26 @@ sub test_failure_creation {
     };
 }
 
+sub test_item_creation {
+    my $feed = test_successful_creation();
+    my ($id, $token) = ($feed->{identifier}, $feed->{token});
+    my $feed_url = FEEDRO . "/feed/${id}";
+
+    my $ua = Mojo::UserAgent->new();
+    for my $i (1..30) {
+        my $tx = $ua->post(
+            $feed_url . "/items",
+            { Authentication => "Bearer $token" },
+            json => {
+                title => "Some random stuff",
+                content_text => "XXX . $$ . ". localtime(),
+                url => "https://example.com/xxx/$i",
+            }
+        );
+        is $tx->result->code, "200";
+    }
+}
+
 sub test_item_crud {
     my $ua = Mojo::UserAgent->new();
     my $feed = test_successful_creation();
@@ -150,6 +170,7 @@ sub test_item_crud {
 }
 
 test_failure_creation;
+test_item_creation;
 test_item_crud;
 
 done_testing;

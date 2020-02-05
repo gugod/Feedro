@@ -5,6 +5,7 @@ requires 'Data::UUID';
 requires 'Digest::SHA1';
 requires 'XML::FeedPP';
 requires 'NewsExtractor';
+requires 'Time::Moment';
 
 on test => sub {
     requires 'Test2::V0';
