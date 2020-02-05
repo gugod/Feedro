@@ -6,4 +6,5 @@ steps:
     image: perl:5.28
     commands:
       - cpanm -q --notest --installdeps .
+      - plackup ./feedro.pl --listen 'localhost:3000' &
       - yath --qvf
