@@ -248,7 +248,7 @@ post '/feed/:identifier/items' => sub {
         $item = {};
         for my $x (qw< id title content_text url >) {
             if (my $y = $c->param($x)) {
-                $item->{$x} = $y;
+                $item->{$x} = "$y";
             }
         }
     }
