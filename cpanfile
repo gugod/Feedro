@@ -1,3 +1,5 @@
+requires 'Feersum';
+requires 'Gazelle';
 requires 'Mojolicious';
 requires 'JSON::Feed', '1.000';
 requires 'Path::Tiny';
