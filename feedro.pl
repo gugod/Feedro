@@ -182,6 +182,9 @@ sub load_xml_feed_from_json_feed {
             title => $item->{title},
             description => ($item->{content_html} // $item->{content_text}),
             pubDate => $item->{date_published},
+            ($item->{author} ? (
+                author => $item->{author},
+            ):()),
         );
     }
     return;
@@ -241,6 +244,9 @@ post '/feed/:identifier/items' => sub {
                     $item->{$x} = $y;
                 }
             }
+        }
+        if ( my $y = $c->param('author.name') ) {
+            $item->{author}{name} = $y;
         }
     }
 
