@@ -6,7 +6,6 @@ use Encode qw< encode_utf8 decode_utf8 >;
 use Mojo::UserAgent;
 use Getopt::Long qw< GetOptions >;
 use Digest::SHA1 qw< sha1_hex >;
-use JSON;
 use JSON::Feed;
 use Data::UUID;
 use XML::Loy;
@@ -34,7 +33,7 @@ sub fetch_feed_items {
 
     if ($url =~ /\.json$/) {
         my $body = "". $tx->result->body;
-        my $feed = JSON::Feed->parse( \$body );
+        my $feed = JSON::Feed->from_string( $body );
         # XXX: Fix leaky JSON::Feed
         @items = @{$feed->feed->{items}};
     } else {
