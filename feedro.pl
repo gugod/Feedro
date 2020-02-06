@@ -73,7 +73,7 @@ sub load_tokens {
 
 sub load_feed {
     my ($id) = @_;
-    return JSON::Feed->from_string( path(FEEDRO_STORAGE_DIR)->child($id . '.json')->slurp() );
+    return JSON::Feed->from_string( path(FEEDRO_STORAGE_DIR)->child($id . '.json')->slurp_utf8() );
 }
 
 sub sha1_base64 {
