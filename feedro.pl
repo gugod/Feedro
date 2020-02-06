@@ -160,7 +160,7 @@ sub append_item {
     $item->{date_published} //= Time::Moment->now->strftime('%Y-%m-%dT%H:%M:%S%f%Z');
 
     $feed->add_item(%$item);
-    if ( @{ $feed->feed->{items} } > 1000 ) {
+    if ( @{ $feed->feed->{items} } > 25 ) {
         shift @{ $feed->feed->{items} };
     }
 
