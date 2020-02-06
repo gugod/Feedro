@@ -5,6 +5,7 @@ use Test2::V0;
 use Mojo::UserAgent;
 use Data::Dumper qw<Dumper>;
 use Digest::SHA1 qw(sha1_hex);
+use JSON qw(decode_json);
 use constant FEEDRO => "http://localhost:3000";
 
 sub is_prime {
@@ -32,6 +33,12 @@ sub proof {
         $h = sha1_hex(join "\n", $title, $description, $t, $prime);
     }
     return [ $t, $prime, $h ];
+}
+
+sub get_new_unique_url {
+    state $n = 1;
+    $n = next_prime($n);
+    return "http://example.com/prime/$n";
 }
 
 sub test_successful_creation {
@@ -92,7 +99,7 @@ sub test_item_creation {
             json => {
                 title => "Some random stuff",
                 content_text => "XXX . $$ . ". localtime(),
-                url => "https://example.com/xxx/$i",
+                url => get_new_unique_url(),
             }
         );
         is $tx->result->code, "200";
@@ -104,13 +111,16 @@ sub test_item_crud {
     my $feed = test_successful_creation();
     my ($id, $token) = ($feed->{identifier}, $feed->{token});
 
+    my $feedro_items_url = FEEDRO . "/feed/${id}/items";
+    my $feed_url = FEEDRO . "/feed/${id}.json";
+
     subtest "Without tokens, expect failures" => sub {
         my $tx = $ua->post(
-            FEEDRO . "/feed/${id}/items",
+            $feedro_items_url,
             json => {
                 title => "Some random stuff",
                 content_text => "XXX",
-                url => "https://example.com",
+                url => get_new_unique_url(),
             }
         );
         is $tx->result->code, "401",
@@ -118,37 +128,66 @@ sub test_item_crud {
 
     subtest "With the correct token, expect successes" => sub {
         my $tx = $ua->post(
-            FEEDRO . "/feed/${id}/items",
+            $feedro_items_url,
             { Authentication => "Bearer $token" },
             json => {
                 title => "Some random stuff",
                 content_text => "XXX",
-                url => "https://example.com",
+                url => get_new_unique_url(),
             }
         );
         is $tx->result->code, "200";
     };
 
     subtest "With author, expect successes" => sub {
+        my $url = get_new_unique_url();
+        my $author_name = "Mr. " . next_prime(time);
+
         my $tx = $ua->post(
-            FEEDRO . "/feed/${id}/items",
+            $feedro_items_url,
             { Authentication => "Bearer $token" },
             json => {
                 title => "Some random stuff",
                 content_text => "XXX",
-                url => "https://example.com",
+                url => $url,
                 author => {
-                    name => "Someone",
+                    name => $author_name,
                 }
             }
         );
         is $tx->result->code, "200";
+
+        my $data = $ua->get($feed_url)->result->json;
+        my ($item) = grep { $_->{url} eq $url } @{$data->{items}};
+        ok $item->{author};
+        is $item->{author}{name}, $author_name;
+    };
+
+    subtest "post with form" => sub {
+        my $url = get_new_unique_url();
+        my $author_name = "Mr. " . next_prime(time);
+        my $tx = $ua->post(
+            $feedro_items_url,
+            { Authentication => "Bearer $token" },
+            form => {
+                title => "Some random stuff",
+                content_text => "XXX",
+                url => $url,
+                "author.name" => $author_name,
+            }
+        );
+        is $tx->result->code, "200";
+
+        my $data = $ua->get($feed_url)->result->json;
+        my ($item) = grep { $_->{url} eq $url } @{$data->{items}};
+        ok $item->{author};
+        is $item->{author}{name}, $author_name;
     };
 
     subtest "Delete all items from the feed" => sub {
         my ($id, $token) = ($feed->{identifier}, $feed->{token});
         subtest "No token, expecting failures." => sub {
-            my $tx = $ua->delete(FEEDRO . "/feed/${id}/items");
+            my $tx = $ua->delete($feedro_items_url);
             is $tx->res->code, 401;
             is $tx->res->json, {
                 error => D(),
@@ -157,7 +196,7 @@ sub test_item_crud {
 
         subtest "Correct token, expecting successful." => sub {
             my $tx = $ua->delete(
-                FEEDRO . "/feed/${id}/items",
+                $feedro_items_url,
                 { Authentication => "Bearer $token" }
             );
             is $tx->res->code, 200;
