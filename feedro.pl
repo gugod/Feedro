@@ -160,8 +160,9 @@ sub append_item {
     $item->{date_published} //= Time::Moment->now->strftime('%Y-%m-%dT%H:%M:%S%f%Z');
 
     $feed->add_item(%$item);
-    if ( @{ $feed->feed->{items} } > 100 ) {
-        splice @{ $feed->feed->{items} }, 100;
+    my $item_count = @{ $feed->feed->{items} };
+    if ( $item_count > 100 ) {
+        splice @{ $feed->feed->{items} }, 0, $item_count - 100;
     }
 
     save_feed($feed_id, $feed);
