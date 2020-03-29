@@ -8,6 +8,7 @@ requires 'Digest::SHA1';
 requires 'XML::FeedPP';
 requires 'NewsExtractor';
 requires 'Time::Moment';
+requires 'Math::Prime::XS';
 
 on test => sub {
     requires 'Test2::V0';

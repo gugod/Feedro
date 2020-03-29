@@ -8,6 +8,7 @@ use XML::FeedPP; # Implies: XML::FeedPP::RSS, XML::FeedPP::Atom::Atom10;
 use Digest::SHA1 qw<sha1_hex>;
 use Data::UUID;
 use Path::Tiny qw< path >;
+use Math::Prime::XS qw< is_prime >;
 
 use constant {
     FEEDRO_STORAGE_DIR => $ENV{FEEDRO_STORAGE_DIR} // '/tmp/feedro/',
@@ -83,14 +84,6 @@ sub sha1_base64 {
     my $b64 = $sha1->b64digest;
     my $b64uri = $b64 =~ y{+/}{-_}r;
     return $b64uri;
-}
-
-sub is_prime {
-    my $n = $_[0];
-    for my $k (2..sqrt($n)) {
-        return 0 if $n % $k == 0;
-    }
-    return 1;
 }
 
 sub encode_utf8 {

@@ -6,15 +6,9 @@ use Mojo::UserAgent;
 use Data::Dumper qw<Dumper>;
 use Digest::SHA1 qw(sha1_hex);
 use JSON qw(decode_json);
-use constant FEEDRO => "http://localhost:3000";
+use Math::Prime::XS qw(is_prime);
 
-sub is_prime {
-    my $n = $_[0];
-    for my $k (2..sqrt($n)) {
-        return 0 if $n % $k == 0;
-    }
-    return 1;
-}
+use constant FEEDRO => "http://localhost:3000";
 
 sub next_prime {
     my $n = $_[0] + 1;
