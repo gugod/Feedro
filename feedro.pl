@@ -9,6 +9,7 @@ use Digest::SHA1 qw<sha1_hex>;
 use Data::UUID;
 use Path::Tiny qw< path >;
 use Math::Prime::XS qw< is_prime >;
+use Encode qw< encode_utf8 >;
 
 use constant {
     FEEDRO_STORAGE_DIR => $ENV{FEEDRO_STORAGE_DIR} // '/tmp/feedro/',
@@ -84,12 +85,6 @@ sub sha1_base64 {
     my $b64 = $sha1->b64digest;
     my $b64uri = $b64 =~ y{+/}{-_}r;
     return $b64uri;
-}
-
-sub encode_utf8 {
-    my $s = $_[0] . "";
-    utf8::encode($s);
-    return $s;
 }
 
 sub proof_looks_ok {
