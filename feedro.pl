@@ -1,12 +1,12 @@
 #!/usr/bin/env perl
 use Mojolicious::Lite;
 
-use Mojo::Collection;
-use Time::Moment;
-use JSON::Feed '1.000';
-use XML::FeedPP; # Implies: XML::FeedPP::RSS, XML::FeedPP::Atom::Atom10;
+use Mojo::Collection ();
+use Time::Moment ();
+use Data::UUID ();
+use JSON::Feed 1.000 ();
+use XML::FeedPP (); # Implies: XML::FeedPP::RSS, XML::FeedPP::Atom::Atom10;
 use Digest::SHA1 qw<sha1_hex>;
-use Data::UUID;
 use Path::Tiny qw< path >;
 use Math::Prime::XS qw< is_prime >;
 use Encode qw< encode_utf8 >;
