@@ -52,12 +52,12 @@ sub feed_path_rss  { my $id = $_[0]; path( FEEDRO_STORAGE_DIR, "${id}.rss"  ) }
 
 sub save_feed {
     my ($id, $feed) = @_;
-    my $str = $feed->to_string;
-    path( FEEDRO_STORAGE_DIR, "${id}.json" )->spew_utf8($str);
+
+    feed_path_json($id)->spew_utf8( "". $feed->to_string );
 
     my @xml_feeds = (
-        [ XML::FeedPP::Atom::Atom10->new(), path( FEEDRO_STORAGE_DIR, "${id}.atom" ) ],
-        [ XML::FeedPP::RSS->new(), path( FEEDRO_STORAGE_DIR, "${id}.rss" ) ],
+        [ XML::FeedPP::Atom::Atom10->new(), feed_path_atom($id) ],
+        [ XML::FeedPP::RSS->new(), feed_path_rss($id) ],
     );
 
     for my $el (@xml_feeds) {
