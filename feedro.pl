@@ -43,7 +43,7 @@ sub token_is_valid {
 
 sub feed_exists {
     my ($id) = @_;
-    return !!( path( FEEDRO_STORAGE_DIR, "${id}.json" )->exists );
+    return feed_path_json($id)->exists;
 }
 
 sub feed_path_json { my $id = $_[0]; path( FEEDRO_STORAGE_DIR, "${id}.json" ) }
