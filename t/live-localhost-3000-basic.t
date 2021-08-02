@@ -53,8 +53,8 @@ sub test_successful_creation {
         $feed = $res->json;
         is $res->code, "200", "A successful code";
         is $feed, hash {
-            field identifier => D();
-            field token => D();
+            field "identifier" => D();
+            field "token" => D();
         }, "The structure of successful response";
     };
     return $feed;
@@ -82,7 +82,7 @@ sub test_failure_creation {
 
 sub test_item_creation {
     my $feed = test_successful_creation();
-    my ($id, $token) = ($feed->{identifier}, $feed->{token});
+    my ($id, $token) = ($feed->{"identifier"}, $feed->{"token"});
     my $feed_url = FEEDRO . "/feed/${id}";
 
     my $ua = Mojo::UserAgent->new();
@@ -103,7 +103,7 @@ sub test_item_creation {
 sub test_item_crud {
     my $ua = Mojo::UserAgent->new();
     my $feed = test_successful_creation();
-    my ($id, $token) = ($feed->{identifier}, $feed->{token});
+    my ($id, $token) = ($feed->{"identifier"}, $feed->{"token"});
 
     my $feedro_items_url = FEEDRO . "/feed/${id}/items";
     my $feed_url = FEEDRO . "/feed/${id}.json";
@@ -141,11 +141,11 @@ sub test_item_crud {
             $feedro_items_url,
             { Authentication => "Bearer $token" },
             json => {
-                title => "Some random stuff",
+                title => "Some random stuff. +author.name",
                 content_text => "XXX",
                 url => $url,
                 author => {
-                    name => $author_name,
+                    "name" => $author_name,
                 }
             }
         );
@@ -153,8 +153,10 @@ sub test_item_crud {
 
         my $data = $ua->get($feed_url)->result->json;
         my ($item) = grep { $_->{url} eq $url } @{$data->{items}};
-        ok $item->{author};
-        is $item->{author}{name}, $author_name;
+        is $item->{"author"}, hash {
+            field "name" => $author_name;
+            end();
+        };
     };
 
     subtest "post with form" => sub {
@@ -164,9 +166,9 @@ sub test_item_crud {
             $feedro_items_url,
             { Authentication => "Bearer $token" },
             form => {
-                title => "Some random stuff",
-                content_text => "XXX",
-                url => $url,
+                "title" => "Some random stuff. +author.name",
+                "content_text" => "XXX",
+                "url" => $url,
                 "author.name" => $author_name,
             }
         );
@@ -174,12 +176,14 @@ sub test_item_crud {
 
         my $data = $ua->get($feed_url)->result->json;
         my ($item) = grep { $_->{url} eq $url } @{$data->{items}};
-        ok $item->{author};
-        is $item->{author}{name}, $author_name;
+        is $item->{"author"}, hash {
+            field "name" => $author_name;
+            end();
+        };
     };
 
     subtest "Delete all items from the feed" => sub {
-        my ($id, $token) = ($feed->{identifier}, $feed->{token});
+        my ($id, $token) = ($feed->{"identifier"}, $feed->{"token"});
         subtest "No token, expecting failures." => sub {
             my $tx = $ua->delete($feedro_items_url);
             is $tx->res->code, 401;
