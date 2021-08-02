@@ -3,6 +3,7 @@ use v5.18;
 use Test2::V0;
 
 use Mojo::UserAgent;
+use List::Util qw<first>;
 use Data::Dumper qw<Dumper>;
 use Digest::SHA1 qw(sha1_hex);
 use JSON qw(decode_json);
@@ -83,12 +84,13 @@ sub test_failure_creation {
 sub test_item_creation {
     my $feed = test_successful_creation();
     my ($id, $token) = ($feed->{"identifier"}, $feed->{"token"});
-    my $feed_url = FEEDRO . "/feed/${id}";
+    my $feed_url = FEEDRO . "/feed/${id}.json";
+    my $feedro_items_url = FEEDRO . "/feed/${id}/items";
 
     my $ua = Mojo::UserAgent->new();
     for my $i (1..30) {
         my $tx = $ua->post(
-            $feed_url . "/items",
+            $feedro_items_url,
             { Authentication => "Bearer $token" },
             json => {
                 title => "Some random stuff",
@@ -98,15 +100,6 @@ sub test_item_creation {
         );
         is $tx->result->code, "200";
     }
-}
-
-sub test_item_crud {
-    my $ua = Mojo::UserAgent->new();
-    my $feed = test_successful_creation();
-    my ($id, $token) = ($feed->{"identifier"}, $feed->{"token"});
-
-    my $feedro_items_url = FEEDRO . "/feed/${id}/items";
-    my $feed_url = FEEDRO . "/feed/${id}.json";
 
     subtest "Without tokens, expect failures" => sub {
         my $tx = $ua->post(
@@ -151,11 +144,18 @@ sub test_item_crud {
         );
         is $tx->result->code, "200";
 
-        my $data = $ua->get($feed_url)->result->json;
-        my ($item) = grep { $_->{url} eq $url } @{$data->{items}};
-        is $item->{"author"}, hash {
-            field "name" => $author_name;
-            end();
+        my $res = $ua->get($feed_url)->result;
+
+        is $res->code, "200";
+
+        my $item = first { $_->{url} eq $url } @{$res->json->{"items"}};
+
+        is $item, hash {
+            field "author" => hash {
+                field "name" => $author_name;
+                end();
+            };
+            etc();
         };
     };
 
@@ -175,15 +175,28 @@ sub test_item_crud {
         is $tx->result->code, "200";
 
         my $data = $ua->get($feed_url)->result->json;
-        my ($item) = grep { $_->{url} eq $url } @{$data->{items}};
-        is $item->{"author"}, hash {
-            field "name" => $author_name;
-            end();
+        my $item = first { $_->{url} eq $url } @{$data->{items}};
+
+        is $item, hash {
+            field "author" => hash {
+                field "name" => $author_name;
+                end();
+            };
+            etc();
         };
     };
 
+    return $feed;
+}
+
+sub test_item_deletion {
+    my $feed = test_item_creation();
+
+    my ($id, $token) = ($feed->{"identifier"}, $feed->{"token"});
+    my $feedro_items_url = FEEDRO . "/feed/${id}/items";
+    my $ua = Mojo::UserAgent->new();
+
     subtest "Delete all items from the feed" => sub {
-        my ($id, $token) = ($feed->{"identifier"}, $feed->{"token"});
         subtest "No token, expecting failures." => sub {
             my $tx = $ua->delete($feedro_items_url);
             is $tx->res->code, 401;
@@ -206,8 +219,8 @@ sub test_item_crud {
     };
 }
 
-test_failure_creation;
 test_item_creation;
-test_item_crud;
+test_failure_creation;
+test_item_deletion;
 
 done_testing;

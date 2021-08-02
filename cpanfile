@@ -9,6 +9,7 @@ requires 'XML::FeedPP';
 requires 'NewsExtractor';
 requires 'Time::Moment';
 requires 'Math::Prime::XS';
+requires 'List::Util';
 requires 'Encode';
 
 on test => sub {
