@@ -275,7 +275,7 @@ del '/feed/:identifier/items' => sub {
     $c->render( json => { ok => \1 });
 };
 
-get '/feed/:identifier' => sub {
+get '/feed/:identifier' => [ "format" => ["json", "atom", "rss"] ] => sub {
     my ($c)  = @_;
     my $id   = $c->param('identifier');
 
