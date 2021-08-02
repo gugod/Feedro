@@ -136,7 +136,7 @@ sub append_item {
 
     my $feed = load_feed( $feed_id );
 
-    my $items = Mojo::Collection->new(@{ $feed->feed->{items} });
+    my $items = Mojo::Collection->new(@{ $feed->get("items") });
     if ( $item->{id} && $items->first(sub { $_->{id} eq $item->{id} }) ) {
         return {};
     } elsif ( $item->{url} && $items->first(sub { $_->{url} && ($_->{url} eq $item->{url}) }) ) {
