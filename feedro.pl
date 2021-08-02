@@ -234,8 +234,9 @@ post '/feed/:identifier/items' => sub {
                 }
             }
         }
+
         if ( my $y = $c->param('author.name') ) {
-            $item->{author}{name} = $y;
+            $item->{"author"} = { "name" => $y };
         }
     }
 
